@@ -1,0 +1,243 @@
+@import 'tailwindcss';
+
+:root {
+	--bg-main: #f0f5fa;
+	--card-bg: #ffffff;
+	--card-border: #e2e8f0;
+	--brand-navy: #0e2544;
+	--brand-navy-dark: #091a30;
+	--brand-navy-light: #163866;
+	--text-main: #0e2544;
+	--text-muted: #475569;
+	--text-subtle: #64748b;
+	--input-border: #cbd5e1;
+	--input-focus: #0e2544;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+	-webkit-tap-highlight-color: transparent;
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	color: var(--text-main);
+	font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	overflow-x: hidden;
+}
+
+/* Mobile Gradient Background (< 768px) */
+@media (max-width: 767px) {
+	body {
+		background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 20%, #38bdf8 50%, #0284c7 75%, #082f49 100%) !important;
+		background-attachment: fixed !important;
+	}
+}
+
+/* Desktop Background (>= 768px) */
+@media (min-width: 768px) {
+	body {
+		background-color: #f0f5fa;
+	}
+}
+
+/* Heading font */
+h1, h2, h3, h4, .font-heading {
+	font-family: var(--font-heading), system-ui, sans-serif;
+	letter-spacing: -0.01em;
+}
+
+/* Clean Form Input with 16px base font on mobile to prevent iOS Safari auto-zoom */
+.form-input {
+	width: 100%;
+	background-color: #ffffff;
+	border: 1.5px solid var(--input-border);
+	border-radius: 10px;
+	padding: 12px 14px;
+	font-size: 1rem; /* 16px prevents iOS Safari auto-zoom */
+	font-family: var(--font-sans), system-ui, sans-serif;
+	color: #0e2544;
+	transition: border-color 0.12s ease, box-shadow 0.12s ease;
+	touch-action: manipulation;
+}
+
+@media (min-width: 640px) {
+	.form-input {
+		font-size: 0.9375rem; /* 15px on tablet/desktop */
+		padding: 10px 14px;
+	}
+}
+
+.form-input::placeholder {
+	color: #94a3b8;
+	font-size: 0.875rem;
+}
+
+.form-input:hover:not(:focus):not(:disabled) {
+	border-color: #94a3b8;
+}
+
+.form-input:focus {
+	outline: none;
+	border-color: #0e2544;
+	box-shadow: 0 0 0 3px rgba(14, 37, 68, 0.14);
+}
+
+.form-input:disabled {
+	background-color: #f8fafc;
+	color: #94a3b8;
+	cursor: not-allowed;
+	border-color: #e2e8f0;
+}
+
+.form-input.input-error {
+	border-color: #dc2626 !important;
+	background-color: #fffafb;
+}
+
+.form-input.input-error:focus {
+	box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;
+}
+
+/* High-Performance Card */
+.clean-card {
+	background-color: #ffffff;
+	border: 1px solid #e2e8f0;
+	border-radius: 18px;
+	box-shadow: 
+		0 12px 30px -5px rgba(14, 37, 68, 0.1),
+		0 4px 12px -2px rgba(14, 37, 68, 0.05);
+	contain: content;
+}
+
+/* Primary Button */
+.btn-primary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--font-heading), system-ui, sans-serif;
+	font-weight: 700;
+	font-size: 0.9375rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	border-radius: 10px;
+	padding: 14px 26px;
+	min-height: 48px;
+	background-color: #0e2544;
+	color: #ffffff;
+	border: 1px solid transparent;
+	box-shadow: 0 3px 10px rgba(14, 37, 68, 0.2);
+	cursor: pointer;
+	touch-action: manipulation;
+	transition: background-color 0.15s ease, transform 0.1s ease;
+	transform: translateZ(0);
+	will-change: transform;
+}
+
+.btn-primary:hover:not(:disabled) {
+	background-color: #163866;
+}
+
+.btn-primary:active:not(:disabled) {
+	transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* Secondary Button */
+.btn-secondary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--font-heading), system-ui, sans-serif;
+	font-weight: 600;
+	font-size: 0.875rem;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	border-radius: 10px;
+	padding: 12px 20px;
+	min-height: 46px;
+	background-color: #ffffff;
+	color: #475569;
+	border: 1.5px solid #cbd5e1;
+	cursor: pointer;
+	touch-action: manipulation;
+	transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+	background-color: #f8fafc;
+	color: #0e2544;
+	border-color: #94a3b8;
+}
+
+/* GPU Animations */
+@keyframes waveFlowSlow {
+	0% { transform: translate3d(0, 0, 0); }
+	50% { transform: translate3d(-25%, 0, 0); }
+	100% { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes waveFlowFast {
+	0% { transform: translate3d(0, 0, 0); }
+	50% { transform: translate3d(-20%, 0, 0); }
+	100% { transform: translate3d(-40%, 0, 0); }
+}
+
+@keyframes boatBobbing {
+	0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+	25% { transform: translate3d(0, -6px, 0) rotate(2deg); }
+	75% { transform: translate3d(0, 3px, 0) rotate(-1.5deg); }
+}
+
+@keyframes subSwim {
+	0% { transform: translate3d(-30px, 0, 0); }
+	50% { transform: translate3d(20px, -8px, 0); }
+	100% { transform: translate3d(-30px, 0, 0); }
+}
+
+@keyframes subFloatMobile {
+	0%, 100% { transform: translateY(0) rotate(0deg); }
+	50% { transform: translateY(-8px) rotate(2deg); }
+}
+
+.gpu-accelerated {
+	transform: translateZ(0);
+	backface-visibility: hidden;
+	perspective: 1000px;
+	will-change: transform;
+}
+
+.animate-wave-slow {
+	animation: waveFlowSlow 22s linear infinite;
+	will-change: transform;
+}
+
+.animate-wave-fast {
+	animation: waveFlowFast 14s linear infinite;
+	will-change: transform;
+}
+
+.animate-boat {
+	animation: boatBobbing 4.5s ease-in-out infinite;
+	will-change: transform;
+}
+
+.animate-sub {
+	animation: subSwim 12s ease-in-out infinite;
+	will-change: transform;
+}
+
+.animate-sub-mobile {
+	animation: subFloatMobile 5s ease-in-out infinite;
+}
