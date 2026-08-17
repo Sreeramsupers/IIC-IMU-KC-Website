@@ -342,19 +342,34 @@ export default function Home() {
 		try {
 			// Generate a unique reference ID
 			const generatedRefId = `IIC-2627-${Math.floor(1000 + Math.random() * 9000)}`;
-			setSubmittedRefId(generatedRefId);
+			const payload = {
+				...formData,
+				referenceId: generatedRefId,
+				submittedAt: new Date().toISOString(),
+			};
 
-			await fetch('/api/submit', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					...formData,
-					referenceId: generatedRefId,
-					submittedAt: new Date().toISOString(),
-				}),
-			});
+			const directGoogleUrl =
+				process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL ||
+				'https://script.google.com/macros/s/AKfycbxv10O9EXLDYAb1Im8m8hG7g40jtOinRi_-dXTdHIU51ohFkqn-A2K7nQ9AmA2eEsSo/exec';
+
+			try {
+				const res = await fetch('/api/submit', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload),
+				});
+				if (!res.ok) {
+					throw new Error('Serverless route returned ' + res.status);
+				}
+			} catch (apiError) {
+				console.warn('API route not reachable, submitting directly to Google Apps Script:', apiError);
+				await fetch(directGoogleUrl, {
+					method: 'POST',
+					mode: 'no-cors',
+					headers: { 'Content-Type': 'text/plain' },
+					body: JSON.stringify(payload),
+				});
+			}
 		} catch (err) {
 			console.error('Submission request failed:', err);
 		} finally {
