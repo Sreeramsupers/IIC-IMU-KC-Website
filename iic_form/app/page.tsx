@@ -342,6 +342,7 @@ export default function Home() {
 		try {
 			// Generate a unique reference ID
 			const generatedRefId = `IIC-2627-${Math.floor(1000 + Math.random() * 9000)}`;
+			setSubmittedRefId(generatedRefId);
 			const payload = {
 				...formData,
 				referenceId: generatedRefId,
