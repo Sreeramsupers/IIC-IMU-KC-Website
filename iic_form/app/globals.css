@@ -110,10 +110,10 @@ h1, h2, h3, h4, .font-heading {
 .clean-card {
 	background-color: #ffffff;
 	border: 1px solid #e2e8f0;
-	border-radius: 18px;
+	border-radius: 20px;
 	box-shadow: 
-		0 12px 30px -5px rgba(14, 37, 68, 0.1),
-		0 4px 12px -2px rgba(14, 37, 68, 0.05);
+		0 16px 36px -8px rgba(14, 37, 68, 0.12),
+		0 4px 16px -2px rgba(14, 37, 68, 0.06);
 	contain: content;
 }
 
@@ -124,25 +124,26 @@ h1, h2, h3, h4, .font-heading {
 	justify-content: center;
 	font-family: var(--font-heading), system-ui, sans-serif;
 	font-weight: 700;
-	font-size: 0.9375rem;
-	letter-spacing: 0.04em;
+	font-size: 0.875rem;
+	letter-spacing: 0.03em;
 	text-transform: uppercase;
 	border-radius: 10px;
-	padding: 14px 26px;
-	min-height: 48px;
+	padding: 12px 22px;
+	min-height: 46px;
 	background-color: #0e2544;
 	color: #ffffff;
 	border: 1px solid transparent;
 	box-shadow: 0 3px 10px rgba(14, 37, 68, 0.2);
 	cursor: pointer;
 	touch-action: manipulation;
-	transition: background-color 0.15s ease, transform 0.1s ease;
+	transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 	transform: translateZ(0);
 	will-change: transform;
 }
 
 .btn-primary:hover:not(:disabled) {
 	background-color: #163866;
+	box-shadow: 0 4px 14px rgba(14, 37, 68, 0.25);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -165,8 +166,8 @@ h1, h2, h3, h4, .font-heading {
 	letter-spacing: 0.02em;
 	text-transform: uppercase;
 	border-radius: 10px;
-	padding: 12px 20px;
-	min-height: 46px;
+	padding: 11px 18px;
+	min-height: 44px;
 	background-color: #ffffff;
 	color: #475569;
 	border: 1.5px solid #cbd5e1;
@@ -179,6 +180,98 @@ h1, h2, h3, h4, .font-heading {
 	background-color: #f8fafc;
 	color: #0e2544;
 	border-color: #94a3b8;
+}
+
+/* Section Container & Badges */
+.section-container {
+	background: #ffffff;
+	border: 1px solid #e2e8f0;
+	border-radius: 16px;
+	padding: 1.5rem;
+	box-shadow: 0 2px 8px rgba(14, 37, 68, 0.03);
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.section-container:hover {
+	border-color: #cbd5e1;
+}
+
+.section-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding: 4px 10px;
+	border-radius: 9999px;
+	background-color: #f0f9ff;
+	color: #0369a1;
+	border: 1px solid #bae6fd;
+}
+
+/* N/A Toggle Pill */
+.na-toggle-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 12px;
+	border-radius: 8px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	user-select: none;
+}
+
+/* Tag Selection Chips */
+.interest-tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 14px;
+	border-radius: 10px;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	border: 1.5px solid #e2e8f0;
+	background-color: #f8fafc;
+	color: #334155;
+	user-select: none;
+}
+
+.interest-tag-chip:hover {
+	border-color: #94a3b8;
+	background-color: #f1f5f9;
+}
+
+.interest-tag-chip.active {
+	border-color: #0e2544;
+	background-color: #0e2544;
+	color: #ffffff;
+	box-shadow: 0 2px 6px rgba(14, 37, 68, 0.2);
+}
+
+/* Upload Dropzone Card */
+.upload-dropzone {
+	border: 1.5px dashed #cbd5e1;
+	border-radius: 12px;
+	padding: 14px 16px;
+	background-color: #fafbfc;
+	transition: all 0.15s ease;
+}
+
+.upload-dropzone:hover {
+	border-color: #94a3b8;
+	background-color: #f1f5f9;
+}
+
+.upload-dropzone.has-file {
+	border-color: #059669;
+	background-color: #f0fdf4;
 }
 
 /* GPU Animations */
