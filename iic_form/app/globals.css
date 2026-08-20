@@ -31,21 +31,7 @@ body {
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	overflow-x: hidden;
-}
-
-/* Mobile Gradient Background (< 768px) */
-@media (max-width: 767px) {
-	body {
-		background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 20%, #38bdf8 50%, #0284c7 75%, #082f49 100%) !important;
-		background-attachment: fixed !important;
-	}
-}
-
-/* Desktop Background (>= 768px) */
-@media (min-width: 768px) {
-	body {
-		background-color: #f0f5fa;
-	}
+	background-color: #f0f5fa;
 }
 
 /* Heading font */

@@ -224,13 +224,9 @@ async function mergeAllPdfs(
 
 		for (const item of validPdfs) {
 			try {
-				const base64Data = item.dataUrl.split(',')[1] || item.dataUrl;
-				const binaryStr = atob(base64Data);
-				const bytes = new Uint8Array(binaryStr.length);
-				for (let i = 0; i < binaryStr.length; i++) {
-					bytes[i] = binaryStr.charCodeAt(i);
-				}
-				const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+				const res = await fetch(item.dataUrl);
+				const buffer = await res.arrayBuffer();
+				const doc = await PDFDocument.load(buffer, { ignoreEncryption: true });
 				const copiedPages = await mergedDoc.copyPages(doc, doc.getPageIndices());
 				copiedPages.forEach((page) => mergedDoc.addPage(page));
 			} catch (itemErr) {
@@ -239,14 +235,16 @@ async function mergeAllPdfs(
 		}
 
 		const mergedBytes = await mergedDoc.save();
-		let binary = '';
-		const len = mergedBytes.byteLength;
-		for (let i = 0; i < len; i++) {
-			binary += String.fromCharCode(mergedBytes[i]);
-		}
-		const mergedBase64 = btoa(binary);
+		const mergedDataUrl = await new Promise<string>((resolve, reject) => {
+			const blob = new Blob([mergedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as string);
+			reader.onerror = reject;
+			reader.readAsDataURL(blob);
+		});
+
 		return {
-			mergedDataUrl: `data:application/pdf;base64,${mergedBase64}`,
+			mergedDataUrl,
 			mergedCount: validPdfs.length,
 		};
 	} catch (err) {
@@ -271,13 +269,6 @@ export default function Home() {
 	const [mergedPdfCount, setMergedPdfCount] = useState<number>(0);
 
 	const isFirstYear = formData.yearOfStudy === '1st Year';
-
-	// Refs for non-blocking direct DOM parallax on Desktop
-	const oceanContainerRef = useRef<HTMLDivElement>(null);
-	const submarineRef = useRef<HTMLDivElement>(null);
-	const boatRef = useRef<HTMLDivElement>(null);
-	const bgMainRef = useRef<HTMLElement>(null);
-	const seabedRef = useRef<HTMLDivElement>(null);
 
 	// Load draft from localStorage on mount
 	useEffect(() => {
@@ -331,58 +322,6 @@ export default function Home() {
 		}
 	}, [formData, submitted]);
 
-	// Desktop Scroll Parallax Listener
-	useEffect(() => {
-		let ticking = false;
-
-		const onScroll = () => {
-			if (window.innerWidth < 768) return;
-
-			if (!ticking) {
-				window.requestAnimationFrame(() => {
-					const winScroll = window.scrollY || document.documentElement.scrollTop;
-					const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-					const progress = docHeight > 0 ? Math.min(1, Math.max(0, winScroll / docHeight)) : 0;
-
-					if (oceanContainerRef.current) {
-						const translateY = Math.max(-280, 220 - progress * 480);
-						oceanContainerRef.current.style.transform = `translate3d(0, ${translateY}px, 0)`;
-					}
-
-					if (boatRef.current) {
-						boatRef.current.style.opacity = String(Math.max(0, 1 - progress * 1.8));
-					}
-					if (submarineRef.current) {
-						const subOpacity =
-							progress > 0.15 && progress < 0.85 ? Math.sin((progress - 0.15) * 4.8) : 0;
-						const subTop = 480 - progress * 320;
-						submarineRef.current.style.opacity = String(subOpacity);
-						submarineRef.current.style.transform = `translate3d(0, ${subTop}px, 0)`;
-					}
-
-					if (seabedRef.current) {
-						seabedRef.current.style.opacity = String(Math.max(0, (progress - 0.7) * 3.3));
-					}
-
-					if (bgMainRef.current && window.innerWidth >= 768) {
-						const r = Math.round(240 - progress * 220);
-						const g = Math.round(245 - progress * 215);
-						const b = Math.round(250 - progress * 195);
-						bgMainRef.current.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-					}
-
-					ticking = false;
-				});
-				ticking = true;
-			}
-		};
-
-		window.addEventListener('scroll', onScroll, { passive: true });
-		onScroll();
-
-		return () => window.removeEventListener('scroll', onScroll);
-	}, []);
-
 	// Field-Level Validation Helper
 	const validateField = (name: string, value: any): string => {
 		switch (name) {
@@ -398,7 +337,7 @@ export default function Home() {
 				const trimmed = typeof value === 'string' ? value.trim() : '';
 				if (!trimmed) {
 					return isFirstYear
-						? 'Serial number / Roll number is required for 1st Year Cadets.'
+						? 'Roll number / Serial number is required for 1st Year Cadets.'
 						: 'Permanent University Registration Number is required.';
 				}
 				if (trimmed.length < 2) return 'Please enter a valid registration/serial number.';
@@ -603,17 +542,19 @@ export default function Home() {
 			return !nameErr && !regErr && !emailErr && !phoneErr && !photoErr;
 		}
 		if (stepNumber === 2) {
-			const cgpaErr = validateField('cgpa', formData.cgpa);
-			if (cgpaErr) return false;
-			if (formData.hasJournalPub && !formData.journalDetails.trim()) return false;
-			if (formData.hasBookChapter && !formData.bookChapterDetails.trim()) return false;
-			if (formData.hasPatents && !formData.patentDetails.trim()) return false;
-			if (formData.hasCompetitions && !formData.competitionDetails.trim()) return false;
+			if (!isFirstYear) {
+				const cgpaErr = validateField('cgpa', formData.cgpa);
+				if (cgpaErr) return false;
+			}
+			if (formData.hasJournalPub && (!formData.journalDetails.trim() || !formData.journalFileDataUrl)) return false;
+			if (formData.hasBookChapter && (!formData.bookChapterDetails.trim() || !formData.bookChapterFileDataUrl)) return false;
+			if (formData.hasPatents && (!formData.patentDetails.trim() || !formData.patentFileDataUrl)) return false;
+			if (formData.hasCompetitions && (!formData.competitionDetails.trim() || !formData.competitionFileDataUrl)) return false;
 			return true;
 		}
 		if (stepNumber === 3) {
-			if (formData.hasActivities && !formData.activityDetails.trim()) return false;
-			if (formData.hasAchievements && !formData.achievementDetails.trim()) return false;
+			if (formData.hasActivities && (!formData.activityDetails.trim() || !formData.activityFileDataUrl)) return false;
+			if (formData.hasAchievements && (!formData.achievementDetails.trim() || !formData.achievementFileDataUrl)) return false;
 			if (formData.hasLeadership && !formData.leadershipDetails.trim()) return false;
 			return true;
 		}
@@ -663,32 +604,64 @@ export default function Home() {
 		}
 
 		if (stepNumber === 2) {
-			const cgpaErr = validateField('cgpa', formData.cgpa);
-			if (cgpaErr) newErrors.cgpa = cgpaErr;
+			if (!isFirstYear) {
+				const cgpaErr = validateField('cgpa', formData.cgpa);
+				if (cgpaErr) newErrors.cgpa = cgpaErr;
+			}
 
-			if (formData.hasJournalPub && !formData.journalDetails.trim()) {
-				newErrors.journalDetails = 'Please provide details of your journal publication.';
+			if (formData.hasJournalPub) {
+				if (!formData.journalDetails.trim()) {
+					newErrors.journalDetails = 'Please enter publication title and details (compulsory).';
+				}
+				if (!formData.journalFileDataUrl) {
+					newErrors.journalFile = 'Please upload the publication PDF (compulsory).';
+				}
 			}
-			if (formData.hasBookChapter && !formData.bookChapterDetails.trim()) {
-				newErrors.bookChapterDetails = 'Please provide details of your book chapter.';
+			if (formData.hasBookChapter) {
+				if (!formData.bookChapterDetails.trim()) {
+					newErrors.bookChapterDetails = 'Please enter book chapter title and details (compulsory).';
+				}
+				if (!formData.bookChapterFileDataUrl) {
+					newErrors.bookChapterFile = 'Please upload the book chapter PDF (compulsory).';
+				}
 			}
-			if (formData.hasPatents && !formData.patentDetails.trim()) {
-				newErrors.patentDetails = 'Please provide details of your patent / IPR.';
+			if (formData.hasPatents) {
+				if (!formData.patentDetails.trim()) {
+					newErrors.patentDetails = 'Please enter patent / IPR title and details (compulsory).';
+				}
+				if (!formData.patentFileDataUrl) {
+					newErrors.patentFile = 'Please upload the certificate / filing PDF (compulsory).';
+				}
 			}
-			if (formData.hasCompetitions && !formData.competitionDetails.trim()) {
-				newErrors.competitionDetails = 'Please provide details of your competition participation.';
+			if (formData.hasCompetitions) {
+				if (!formData.competitionDetails.trim()) {
+					newErrors.competitionDetails = 'Please enter event, year and achievement details (compulsory).';
+				}
+				if (!formData.competitionFileDataUrl) {
+					newErrors.competitionFile = 'Please upload the competition certificate PDF (compulsory).';
+				}
 			}
 		}
 
 		if (stepNumber === 3) {
-			if (formData.hasActivities && !formData.activityDetails.trim()) {
-				newErrors.activityDetails = 'Please provide details of your technical activity.';
+			if (formData.hasActivities) {
+				if (!formData.activityDetails.trim()) {
+					newErrors.activityDetails = 'Please enter technical activity details (compulsory).';
+				}
+				if (!formData.activityFileDataUrl) {
+					newErrors.activityFile = 'Please upload the activity certificate PDF (compulsory).';
+				}
 			}
-			if (formData.hasAchievements && !formData.achievementDetails.trim()) {
-				newErrors.achievementDetails = 'Please provide details of your achievement / award.';
+			if (formData.hasAchievements) {
+				if (!formData.achievementDetails.trim()) {
+					newErrors.achievementDetails = 'Please enter achievement / award details (compulsory).';
+				}
+				if (!formData.achievementFileDataUrl) {
+					newErrors.achievementFile = 'Please upload the award proof PDF (compulsory).';
+				}
 			}
 			if (formData.hasLeadership && !formData.leadershipDetails.trim()) {
-				newErrors.leadershipDetails = 'Please provide details of the leadership position held.';
+				newErrors.leadershipDetails = 'Please provide details of the leadership position held (compulsory).';
 			}
 		}
 
@@ -819,8 +792,21 @@ export default function Home() {
 			const { mergedDataUrl, mergedCount } = await mergeAllPdfs(pdfsToMerge);
 			setMergedPdfCount(mergedCount);
 
+			// Strip redundant individual base64 binaries to optimize network payload size
+			const {
+				marksheetDataUrl,
+				journalFileDataUrl,
+				bookChapterFileDataUrl,
+				patentFileDataUrl,
+				competitionFileDataUrl,
+				activityFileDataUrl,
+				achievementFileDataUrl,
+				leadershipFileDataUrl,
+				...cleanFormData
+			} = formData;
+
 			const payload = {
-				...formData,
+				...cleanFormData,
 				referenceId: generatedRefId,
 				submittedAt: new Date().toISOString(),
 				// Combined master single PDF containing all uploaded proofs & resume
@@ -892,163 +878,7 @@ export default function Home() {
 	};
 
 	return (
-		<main
-			ref={bgMainRef}
-			className='relative w-full min-h-screen py-4 sm:py-8 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start overflow-hidden will-change-[background-color]'>
-			{/* DESKTOP PARALLAX OCEAN ENVIRONMENT */}
-			<div
-				className='hidden md:block fixed inset-0 pointer-events-none z-0 overflow-hidden select-none'
-				style={{ contain: 'strict' }}>
-				{/* Mid-Depth Submarine */}
-				<div
-					ref={submarineRef}
-					className='absolute left-[4%] sm:left-[10%] top-0 z-10 gpu-accelerated opacity-0'>
-					<div className='animate-sub'>
-						<svg
-							width='84'
-							height='44'
-							viewBox='0 0 90 48'
-							fill='none'
-							xmlns='http://www.w3.org/2000/svg'>
-							<rect
-								x='16'
-								y='14'
-								width='54'
-								height='24'
-								rx='12'
-								fill='#f59e0b'
-								stroke='#0e2544'
-								strokeWidth='2'
-							/>
-							<rect
-								x='36'
-								y='6'
-								width='14'
-								height='10'
-								rx='3'
-								fill='#f59e0b'
-								stroke='#0e2544'
-								strokeWidth='2'
-							/>
-							<line
-								x1='43'
-								y1='6'
-								x2='43'
-								y2='2'
-								stroke='#0e2544'
-								strokeWidth='2'
-								strokeLinecap='round'
-							/>
-							<circle cx='46' cy='2' r='2' fill='#38bdf8' />
-							<circle cx='28' cy='26' r='4' fill='#38bdf8' stroke='#0e2544' strokeWidth='1.5' />
-							<circle cx='42' cy='26' r='4' fill='#38bdf8' stroke='#0e2544' strokeWidth='1.5' />
-							<circle cx='56' cy='26' r='4' fill='#38bdf8' stroke='#0e2544' strokeWidth='1.5' />
-							<path d='M10 20L16 26L10 32Z' fill='#0e2544' />
-							<polygon points='70,22 88,16 88,36 70,30' fill='#fef08a' opacity='0.35' />
-						</svg>
-					</div>
-				</div>
-
-				{/* Parallax Ocean Waves */}
-				<div
-					ref={oceanContainerRef}
-					className='absolute inset-x-0 bottom-0 gpu-accelerated'
-					style={{ transform: 'translate3d(0, 220px, 0)' }}>
-					{/* Bobbing Boat */}
-					<div
-						ref={boatRef}
-						className='absolute -top-14 right-[8%] sm:right-[15%] z-20 animate-boat gpu-accelerated'>
-						<svg
-							width='72'
-							height='54'
-							viewBox='0 0 74 56'
-							fill='none'
-							xmlns='http://www.w3.org/2000/svg'>
-							<path d='M37 6L54 28H37V6Z' fill='#0e2544' />
-							<path d='M33 12L20 28H33V12Z' fill='#f59e0b' />
-							<rect x='34' y='4' width='3' height='26' rx='1.5' fill='#ffffff' />
-							<circle cx='35.5' cy='4.5' r='2.5' fill='#f59e0b' />
-							<path
-								d='M10 30L17 44C17.5 45 18.5 46 20 46H56C57.5 46 58.5 45 59 44L66 30H10Z'
-								fill='#ffffff'
-								stroke='#0e2544'
-								strokeWidth='2.5'
-							/>
-							<path d='M13 35L17.5 44H57.5L62 35H13Z' fill='#0284c7' />
-							<circle cx='37' cy='38' r='3.5' fill='#ffffff' stroke='#e11d48' strokeWidth='1.5' />
-						</svg>
-					</div>
-
-					<div className='w-[200%] h-[280px] opacity-40 animate-wave-slow gpu-accelerated'>
-						<svg
-							viewBox='0 0 1200 120'
-							preserveAspectRatio='none'
-							className='w-full h-full fill-[#0a315c]'>
-							<path d='M0,0 C150,90 350,-40 500,50 C650,140 900,10 1200,60 L1200,120 L0,120 Z'></path>
-						</svg>
-					</div>
-
-					<div className='-mt-[230px] w-[200%] h-[250px] opacity-65 animate-wave-fast gpu-accelerated'>
-						<svg
-							viewBox='0 0 1200 120'
-							preserveAspectRatio='none'
-							className='w-full h-full fill-[#0f548a]'>
-							<path d='M0,30 C200,100 450,0 700,70 C950,130 1100,20 1200,40 L1200,120 L0,120 Z'></path>
-						</svg>
-					</div>
-
-					<div className='-mt-[190px] w-[200%] h-[210px] opacity-95 animate-wave-slow relative gpu-accelerated'>
-						<svg
-							viewBox='0 0 1200 120'
-							preserveAspectRatio='none'
-							className='w-full h-full fill-[#0284c7]'>
-							<path d='M0,45 C180,10 380,80 600,30 C820,-10 1020,70 1200,45 L1200,120 L0,120 Z'></path>
-						</svg>
-						<div className='absolute top-0 inset-x-0 h-1.5 bg-sky-200/80 rounded-full' />
-					</div>
-
-					<div className='w-full h-[650px] bg-gradient-to-b from-[#0284c7] via-[#0b3c6d] to-[#04162a]' />
-				</div>
-
-				<div
-					ref={seabedRef}
-					className='absolute bottom-0 inset-x-0 h-36 pointer-events-none opacity-0 gpu-accelerated z-10'>
-					<svg
-						viewBox='0 0 1200 100'
-						preserveAspectRatio='none'
-						className='w-full h-full fill-[#030d1a]'>
-						<path d='M0,100 L0,70 Q200,40 400,65 T800,50 T1200,60 L1200,100 Z'></path>
-					</svg>
-				</div>
-			</div>
-
-			{/* MOBILE SUBMARINE */}
-			<div className='block md:hidden fixed inset-0 pointer-events-none z-0 overflow-hidden select-none'>
-				<div className='absolute bottom-4 right-3 z-10 animate-sub-mobile opacity-80'>
-					<svg
-						width='76'
-						height='40'
-						viewBox='0 0 90 48'
-						fill='none'
-						xmlns='http://www.w3.org/2000/svg'>
-						<rect
-							x='16'
-							y='14'
-							width='54'
-							height='24'
-							rx='12'
-							fill='#f59e0b'
-							stroke='#0e2544'
-							strokeWidth='2'
-						/>
-						<circle cx='46' cy='2' r='2' fill='#38bdf8' />
-						<circle cx='28' cy='26' r='4' fill='#38bdf8' stroke='#0e2544' strokeWidth='1.5' />
-						<circle cx='42' cy='26' r='4' fill='#38bdf8' stroke='#0e2544' strokeWidth='1.5' />
-						<path d='M10 20L16 26L10 32Z' fill='#0e2544' />
-					</svg>
-				</div>
-			</div>
-
+		<main className='relative w-full min-h-screen py-4 sm:py-8 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start bg-slate-100'>
 			{/* Form Shell / Center Card */}
 			<div className='relative z-10 w-full max-w-4xl mb-14 mt-1 sm:mt-2'>
 				<div className='clean-card overflow-hidden'>
@@ -1074,7 +904,7 @@ export default function Home() {
 							<div>
 								<div className='flex items-center gap-2 mb-1'>
 									<span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300'>
-										Session 2026–27
+										Academic Year 2026–27
 									</span>
 									<span className='text-xs font-semibold text-slate-500'>IMU Kolkata Campus</span>
 								</div>
@@ -1092,17 +922,23 @@ export default function Home() {
 						{/* Instructions to Students Banner */}
 						<div className='mt-4 p-3.5 sm:p-4 rounded-xl bg-sky-50/90 border border-sky-200/90 text-sky-950 flex items-start gap-3'>
 							<Info className='w-5 h-5 text-sky-700 flex-shrink-0 mt-0.5' />
-							<div className='text-xs sm:text-sm leading-relaxed'>
-								<strong className='font-bold text-sky-900 block mb-0.5 uppercase tracking-wide text-xs'>
-									Instructions to Students:
-								</strong>
-								Please provide accurate and concise information. Answer all applicable questions.
-								For questions that are not applicable, select{' '}
-								<span className='font-bold text-[#0e2544] bg-sky-100 px-1.5 py-0.2 rounded border border-sky-300'>
-									“Not Applicable (N/A)”
-								</span>
-								. All uploaded PDF documents and proofs will be automatically merged into a single
-								master PDF file for Google Drive storage and email record.
+							<div className='text-xs sm:text-sm leading-relaxed space-y-1.5'>
+								<div className='flex items-center justify-between flex-wrap gap-2'>
+									<strong className='font-bold text-sky-900 uppercase tracking-wide text-xs'>
+										Instructions to Students:
+									</strong>
+									<span className='inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full text-[11px] shadow-xs'>
+										<span className='text-red-600 font-extrabold text-sm leading-none'>*</span> Fields marked with asterisk are mandatory
+									</span>
+								</div>
+								<p>
+									Please provide accurate and concise information. Answer all applicable questions.
+									For questions that are not applicable, select{' '}
+									<span className='font-bold text-[#0e2544] bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300'>
+										“Not Applicable (N/A)”
+									</span>
+									. Fields marked with an asterisk (<span className='text-red-600 font-bold'>*</span>) are mandatory. All uploaded PDF documents and proofs will be automatically merged into a single PDF and mailed to the registered email address of the student.
+								</p>
 							</div>
 						</div>
 					</div>
@@ -1201,12 +1037,9 @@ export default function Home() {
 									</div>
 
 									<div className='p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200 text-emerald-900'>
-										<span className='font-bold block'>
-											✓ Unified Master PDF Sent to Google Drive & Email:
-										</span>
+										<span className='font-bold block'>✓ Unified Master PDF Sent to Google Drive & Email:</span>
 										<span className='text-[11px] text-emerald-800'>
-											All proofs and certificates have been automatically compiled into a single
-											master document.
+											All proofs and certificates have been automatically compiled into a single master document.
 										</span>
 									</div>
 
@@ -1278,7 +1111,7 @@ export default function Home() {
 											{formData.areasOfInterest.map((tag) => (
 												<span
 													key={tag}
-													className='text-[11px] font-semibold bg-slate-200/80 text-[#0e2544] px-2 py-0.5 rounded-md'>
+													className='text-[11px] bg-slate-200/80 text-slate-800 px-2 py-0.5 rounded-full font-medium'>
 													{tag}
 												</span>
 											))}
@@ -1408,7 +1241,7 @@ export default function Home() {
 										<span className='section-badge'>Section 1 of 6</span>
 									</div>
 
-									{/* Row 1: Cadet Name & Registration Number */}
+									{/* Row 1: 1. Name of Cadet & 2. Year of Study */}
 									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
 										<div id='cadetName'>
 											<label
@@ -1438,13 +1271,37 @@ export default function Home() {
 											)}
 										</div>
 
+										<div id='yearOfStudy'>
+											<label
+												htmlFor='yearOfStudySelect'
+												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												2. Year of Study <span className='text-red-600'>*</span>
+											</label>
+											<select
+												id='yearOfStudySelect'
+												name='yearOfStudy'
+												value={formData.yearOfStudy}
+												onChange={handleChange}
+												className='form-input cursor-pointer font-medium'>
+												<option value='1st Year'>1st Year</option>
+												<option value='2nd Year'>2nd Year</option>
+												<option value='3rd Year'>3rd Year</option>
+												<option value='4th Year'>4th Year</option>
+											</select>
+											<p className='text-xs text-slate-500 mt-1.5 font-medium'>
+												Select your current academic batch.
+											</p>
+										</div>
+									</div>
+
+									{/* Row 2: 3. Roll No. / Serial No. & 4. Current Semester */}
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
 										<div id='regNumber'>
 											<div className='flex items-baseline justify-between gap-1 mb-2 flex-wrap'>
 												<label
 													htmlFor='regNumberInput'
 													className='text-xs font-bold uppercase tracking-wider text-[#0e2544]'>
-													2.{' '}
-													{isFirstYear ? 'Serial / Roll Number' : 'University Registration Number'}{' '}
+													3. {isFirstYear ? 'Roll No. / Serial No.' : 'University Registration / Roll Number'}{' '}
 													<span className='text-red-600'>*</span>
 												</label>
 												<span className='text-[11px] font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded border border-sky-200'>
@@ -1460,7 +1317,7 @@ export default function Home() {
 												onBlur={handleBlur}
 												placeholder={
 													isFirstYear
-														? 'Enter allotted serial / roll number'
+														? 'Enter allotted Roll Number / Serial Number'
 														: 'Enter permanent university reg number'
 												}
 												className={`form-input font-mono ${errors.regNumber && touched.regNumber ? 'input-error' : ''}`}
@@ -1472,42 +1329,20 @@ export default function Home() {
 											) : (
 												<p className='text-xs text-slate-500 mt-1.5 font-medium'>
 													{isFirstYear
-														? 'First-year cadets enter your serial/roll number.'
+														? 'First-year cadets enter your roll number / serial.'
 														: 'Enter your permanent university registration number.'}
 												</p>
 											)}
 										</div>
-									</div>
 
-									{/* Row 2: Year of Study & Semester */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div>
+										<div id='semester'>
 											<label
-												htmlFor='yearOfStudy'
-												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												3. Year of Study <span className='text-red-600'>*</span>
-											</label>
-											<select
-												id='yearOfStudy'
-												name='yearOfStudy'
-												value={formData.yearOfStudy}
-												onChange={handleChange}
-												className='form-input cursor-pointer font-medium'>
-												<option value='1st Year'>1st Year</option>
-												<option value='2nd Year'>2nd Year</option>
-												<option value='3rd Year'>3rd Year</option>
-												<option value='4th Year'>4th Year</option>
-											</select>
-										</div>
-
-										<div>
-											<label
-												htmlFor='semester'
+												htmlFor='semesterSelect'
 												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
 												4. Current Semester <span className='text-red-600'>*</span>
 											</label>
 											<select
-												id='semester'
+												id='semesterSelect'
 												name='semester'
 												value={formData.semester}
 												onChange={handleChange}
@@ -1518,11 +1353,14 @@ export default function Home() {
 													</option>
 												))}
 											</select>
+											<p className='text-xs text-slate-500 mt-1.5 font-medium'>
+												Select ongoing semester.
+											</p>
 										</div>
 									</div>
 
-									{/* Row 3: Department & Gender */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
+									{/* Row 3: 5. Department & Gender */}
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start'>
 										<div>
 											<label
 												htmlFor='department'
@@ -1534,7 +1372,7 @@ export default function Home() {
 												name='department'
 												value={formData.department}
 												onChange={handleChange}
-												className='form-input cursor-pointer font-medium'>
+												className='form-input cursor-pointer font-medium h-[46px] sm:h-[42px]'>
 												{DEPARTMENTS.map((dept) => (
 													<option key={dept} value={dept}>
 														{dept}
@@ -1547,14 +1385,14 @@ export default function Home() {
 											<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
 												Gender <span className='text-red-600'>*</span>
 											</label>
-											<div className='flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200'>
-												{['Male', 'Female', 'Other'].map((g) => (
+											<div className='flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 h-[46px] sm:h-[42px]'>
+												{['Male', 'Female'].map((g) => (
 													<label
 														key={g}
-														className={`flex-1 text-center py-2 px-1 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer touch-manipulation transition-all ${
+														className={`flex-1 text-center h-full flex items-center justify-center rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer touch-manipulation transition-all ${
 															formData.gender === g
 																? 'bg-[#0e2544] text-white shadow-sm'
-																: 'text-slate-700 hover:text-slate-950'
+																: 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/60'
 														}`}>
 														<input
 															type='radio'
@@ -1571,7 +1409,7 @@ export default function Home() {
 										</div>
 									</div>
 
-									{/* Row 4: Email Address & Mobile Number */}
+									{/* Row 4: 6. Email Address & 7. Mobile Number */}
 									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
 										<div id='email'>
 											<label
@@ -1710,8 +1548,8 @@ export default function Home() {
 												className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
 												8. Current CGPA {!isFirstYear && <span className='text-red-600'>*</span>}
 											</label>
-											<span className='text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded'>
-												{isFirstYear ? '1st Year Optional' : 'Required'}
+											<span className='text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200'>
+												{isFirstYear ? 'Exempted (1st Year)' : 'Required'}
 											</span>
 										</div>
 
@@ -1721,27 +1559,34 @@ export default function Home() {
 													type='text'
 													id='cgpaInput'
 													name='cgpa'
-													value={formData.cgpa}
+													disabled={isFirstYear}
+													value={isFirstYear ? 'N/A' : formData.cgpa}
 													onChange={handleChange}
 													onBlur={handleBlur}
 													placeholder={
 														isFirstYear
-															? 'Not applicable for 1st Year (or leave N/A)'
+															? 'Disabled for 1st Year Cadets'
 															: 'Enter your Current CGPA (e.g. 8.75)'
 													}
-													className={`form-input ${errors.cgpa && touched.cgpa ? 'input-error' : ''}`}
+													className={`form-input ${
+														isFirstYear
+															? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none border-slate-200 font-bold'
+															: errors.cgpa && touched.cgpa
+																? 'input-error'
+																: ''
+													}`}
 												/>
-												{errors.cgpa && touched.cgpa && (
+												{errors.cgpa && touched.cgpa && !isFirstYear && (
 													<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1'>
 														<AlertCircle className='w-3.5 h-3.5' /> {errors.cgpa}
 													</p>
 												)}
 											</div>
-											<div className='text-xs text-slate-600 bg-sky-50/70 p-3 rounded-lg border border-sky-200'>
-												<span className='font-bold text-sky-900 block mb-0.5'>
-													Notice for First Year Cadets CGPA is optional. You may leave it blank or
-													enter N/A.
+											<div className='text-xs text-slate-700 bg-amber-50/80 p-3 rounded-lg border border-amber-200'>
+												<span className='font-bold text-amber-900 block mb-0.5'>
+													Note:- Optional for first year cadets.
 												</span>
+												1st Year cadets do not possess university CGPA results yet. This field is automatically disabled.
 											</div>
 										</div>
 									</div>
@@ -1750,26 +1595,32 @@ export default function Home() {
 									<div className='section-container space-y-3'>
 										<div className='flex items-center justify-between flex-wrap gap-2'>
 											<div>
-												<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-													9. Journal Publications, if any
-												</label>
-												<span className='text-xs text-slate-500'>
-													Mention publication details & upload first page showing authorship in PDF.
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+														9. Journal Publications, if any
+													</label>
+													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+														Note:- Optional for first year cadets.
+													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-0.5'>
+													Mention publication details & upload authorship proof PDF (compulsory if selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
 												<button
 													type='button'
-													onClick={() =>
+													onClick={() => {
 														setFormData((prev) => ({
 															...prev,
 															hasJournalPub: false,
 															journalDetails: '',
 															journalFileName: '',
 															journalFileDataUrl: '',
-														}))
-													}
+														}));
+														setErrors((prev) => ({ ...prev, journalDetails: '', journalFile: '' }));
+													}}
 													className={`na-toggle-btn ${
 														!formData.hasJournalPub
 															? 'bg-[#0e2544] text-white shadow-xs'
@@ -1792,23 +1643,29 @@ export default function Home() {
 
 										{formData.hasJournalPub && (
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
-												<textarea
-													name='journalDetails'
-													rows={2}
-													value={formData.journalDetails}
-													onChange={handleChange}
-													placeholder='Paper Title, Journal Name, ISSN / DOI, Volume/Issue, Year...'
-													className='form-input resize-none'
-												/>
-												{errors.journalDetails && touched.journalDetails && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.journalDetails}
-													</p>
-												)}
+												<div>
+													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+														Paper Title & Publication Details <span className='text-red-600'>* (Compulsory)</span>
+													</label>
+													<textarea
+														name='journalDetails'
+														rows={2}
+														value={formData.journalDetails}
+														onChange={handleChange}
+														placeholder='Paper Title, Journal Name, ISSN / DOI, Volume/Issue, Year...'
+														className={`form-input resize-none ${errors.journalDetails && touched.journalDetails ? 'input-error' : ''}`}
+													/>
+													{errors.journalDetails && touched.journalDetails && (
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+															<AlertCircle className='w-3.5 h-3.5' /> {errors.journalDetails}
+														</p>
+													)}
+												</div>
+
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
 														<Upload className='w-3.5 h-3.5' />
-														<span>Upload First Page PDF</span>
+														<span>{formData.journalFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
@@ -1829,7 +1686,9 @@ export default function Home() {
 																<FileCheck className='w-4 h-4' /> {formData.journalFileName}
 															</span>
 														) : (
-															'No PDF chosen (Max 15MB)'
+															<span className='text-slate-500'>
+																Upload paper first page PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															</span>
 														)}
 													</span>
 													{formData.journalFileName && (
@@ -1847,6 +1706,11 @@ export default function Home() {
 														</button>
 													)}
 												</div>
+												{errors.journalFile && touched.journalFile && (
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+														<AlertCircle className='w-3.5 h-3.5' /> {errors.journalFile}
+													</p>
+												)}
 											</div>
 										)}
 									</div>
@@ -1855,26 +1719,32 @@ export default function Home() {
 									<div className='section-container space-y-3'>
 										<div className='flex items-center justify-between flex-wrap gap-2'>
 											<div>
-												<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-													10. Book Chapter Publications, if any
-												</label>
-												<span className='text-xs text-slate-500'>
-													Mention publication details & upload first page showing authorship in PDF.
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+														10. Book Chapter Publications, if any
+													</label>
+													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+														Note:- Optional for first year cadets.
+													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-0.5'>
+													Mention publication details & upload book chapter proof PDF (compulsory if selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
 												<button
 													type='button'
-													onClick={() =>
+													onClick={() => {
 														setFormData((prev) => ({
 															...prev,
 															hasBookChapter: false,
 															bookChapterDetails: '',
 															bookChapterFileName: '',
 															bookChapterFileDataUrl: '',
-														}))
-													}
+														}));
+														setErrors((prev) => ({ ...prev, bookChapterDetails: '', bookChapterFile: '' }));
+													}}
 													className={`na-toggle-btn ${
 														!formData.hasBookChapter
 															? 'bg-[#0e2544] text-white shadow-xs'
@@ -1897,28 +1767,39 @@ export default function Home() {
 
 										{formData.hasBookChapter && (
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
-												<textarea
-													name='bookChapterDetails'
-													rows={2}
-													value={formData.bookChapterDetails}
-													onChange={handleChange}
-													placeholder='Book Title, Chapter Title, ISBN, Publisher, Year...'
-													className='form-input resize-none'
-												/>
-												{errors.bookChapterDetails && touched.bookChapterDetails && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.bookChapterDetails}
-													</p>
-												)}
+												<div>
+													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+														Book & Chapter Details <span className='text-red-600'>* (Compulsory)</span>
+													</label>
+													<textarea
+														name='bookChapterDetails'
+														rows={2}
+														value={formData.bookChapterDetails}
+														onChange={handleChange}
+														placeholder='Book Title, Chapter Title, ISBN, Publisher, Year...'
+														className={`form-input resize-none ${errors.bookChapterDetails && touched.bookChapterDetails ? 'input-error' : ''}`}
+													/>
+													{errors.bookChapterDetails && touched.bookChapterDetails && (
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+															<AlertCircle className='w-3.5 h-3.5' /> {errors.bookChapterDetails}
+														</p>
+													)}
+												</div>
+
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
 														<Upload className='w-3.5 h-3.5' />
-														<span>Upload First Page PDF</span>
+														<span>{formData.bookChapterFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
 															onChange={(e) =>
-																handlePdfChange(e, 'bookChapterFileName', 'bookChapterFileDataUrl')
+																handlePdfChange(
+																	e,
+																	'bookChapterFileName',
+																	'bookChapterFileDataUrl',
+																	'bookChapterFile',
+																)
 															}
 															className='sr-only'
 														/>
@@ -1929,7 +1810,9 @@ export default function Home() {
 																<FileCheck className='w-4 h-4' /> {formData.bookChapterFileName}
 															</span>
 														) : (
-															'No PDF chosen (Max 15MB)'
+															<span className='text-slate-500'>
+																Upload book chapter PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															</span>
 														)}
 													</span>
 													{formData.bookChapterFileName && (
@@ -1947,6 +1830,11 @@ export default function Home() {
 														</button>
 													)}
 												</div>
+												{errors.bookChapterFile && touched.bookChapterFile && (
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+														<AlertCircle className='w-3.5 h-3.5' /> {errors.bookChapterFile}
+													</p>
+												)}
 											</div>
 										)}
 									</div>
@@ -1955,26 +1843,32 @@ export default function Home() {
 									<div className='section-container space-y-3'>
 										<div className='flex items-center justify-between flex-wrap gap-2'>
 											<div>
-												<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-													11. Patents / Design Registrations / Copyrights, if any
-												</label>
-												<span className='text-xs text-slate-500'>
-													Mention IPR details and upload the certificate / filing document in PDF.
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+														11. Patents / Design Registrations / Copyrights, if any
+													</label>
+													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+														Note:- Optional for first year cadets.
+													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-0.5'>
+													Mention IPR details & upload certificate / filing document in PDF (compulsory if selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
 												<button
 													type='button'
-													onClick={() =>
+													onClick={() => {
 														setFormData((prev) => ({
 															...prev,
 															hasPatents: false,
 															patentDetails: '',
 															patentFileName: '',
 															patentFileDataUrl: '',
-														}))
-													}
+														}));
+														setErrors((prev) => ({ ...prev, patentDetails: '', patentFile: '' }));
+													}}
 													className={`na-toggle-btn ${
 														!formData.hasPatents
 															? 'bg-[#0e2544] text-white shadow-xs'
@@ -1997,28 +1891,39 @@ export default function Home() {
 
 										{formData.hasPatents && (
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
-												<textarea
-													name='patentDetails'
-													rows={2}
-													value={formData.patentDetails}
-													onChange={handleChange}
-													placeholder='Title of Invention, Application/Grant No, Filing Status, Authority...'
-													className='form-input resize-none'
-												/>
-												{errors.patentDetails && touched.patentDetails && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.patentDetails}
-													</p>
-												)}
+												<div>
+													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+														Patent / IPR Details <span className='text-red-600'>* (Compulsory)</span>
+													</label>
+													<textarea
+														name='patentDetails'
+														rows={2}
+														value={formData.patentDetails}
+														onChange={handleChange}
+														placeholder='Title of Invention, Application/Grant No, Filing Status, Authority...'
+														className={`form-input resize-none ${errors.patentDetails && touched.patentDetails ? 'input-error' : ''}`}
+													/>
+													{errors.patentDetails && touched.patentDetails && (
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+															<AlertCircle className='w-3.5 h-3.5' /> {errors.patentDetails}
+														</p>
+													)}
+												</div>
+
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
 														<Upload className='w-3.5 h-3.5' />
-														<span>Upload Certificate / Filing PDF</span>
+														<span>{formData.patentFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
 															onChange={(e) =>
-																handlePdfChange(e, 'patentFileName', 'patentFileDataUrl')
+																handlePdfChange(
+																	e,
+																	'patentFileName',
+																	'patentFileDataUrl',
+																	'patentFile',
+																)
 															}
 															className='sr-only'
 														/>
@@ -2029,7 +1934,9 @@ export default function Home() {
 																<FileCheck className='w-4 h-4' /> {formData.patentFileName}
 															</span>
 														) : (
-															'No PDF chosen (Max 15MB)'
+															<span className='text-slate-500'>
+																Upload patent/filing PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															</span>
 														)}
 													</span>
 													{formData.patentFileName && (
@@ -2040,7 +1947,6 @@ export default function Home() {
 																	...prev,
 																	patentFileName: '',
 																	patentFileDataUrl: '',
-																	patentDetails: '',
 																}))
 															}
 															className='text-xs font-bold text-red-600 hover:text-red-800 p-1'>
@@ -2048,6 +1954,11 @@ export default function Home() {
 														</button>
 													)}
 												</div>
+												{errors.patentFile && touched.patentFile && (
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+														<AlertCircle className='w-3.5 h-3.5' /> {errors.patentFile}
+													</p>
+												)}
 											</div>
 										)}
 									</div>
@@ -2056,26 +1967,32 @@ export default function Home() {
 									<div className='section-container space-y-3'>
 										<div className='flex items-center justify-between flex-wrap gap-2'>
 											<div>
-												<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-													12. Competitions / Hackathons / Technothons, if any
-												</label>
-												<span className='text-xs text-slate-500'>
-													Mention event, year and achievement, and upload certificate in PDF format.
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+														12. Competitions / Hackathons / Technothons, if any
+													</label>
+													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+														Note:- Optional for first year cadets.
+													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-0.5'>
+													Mention event & achievement, and upload certificate in PDF (compulsory if selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
 												<button
 													type='button'
-													onClick={() =>
+													onClick={() => {
 														setFormData((prev) => ({
 															...prev,
 															hasCompetitions: false,
 															competitionDetails: '',
 															competitionFileName: '',
 															competitionFileDataUrl: '',
-														}))
-													}
+														}));
+														setErrors((prev) => ({ ...prev, competitionDetails: '', competitionFile: '' }));
+													}}
 													className={`na-toggle-btn ${
 														!formData.hasCompetitions
 															? 'bg-[#0e2544] text-white shadow-xs'
@@ -2100,28 +2017,39 @@ export default function Home() {
 
 										{formData.hasCompetitions && (
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
-												<textarea
-													name='competitionDetails'
-													rows={2}
-													value={formData.competitionDetails}
-													onChange={handleChange}
-													placeholder='Event Name, Organising Body, Year, Project/Role, Achievement (Winner, Finalist, Participant)...'
-													className='form-input resize-none'
-												/>
-												{errors.competitionDetails && touched.competitionDetails && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.competitionDetails}
-													</p>
-												)}
+												<div>
+													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+														Event & Achievement Details <span className='text-red-600'>* (Compulsory)</span>
+													</label>
+													<textarea
+														name='competitionDetails'
+														rows={2}
+														value={formData.competitionDetails}
+														onChange={handleChange}
+														placeholder='Event Name, Organising Body, Year, Project/Role, Achievement (Winner, Finalist, Participant)...'
+														className={`form-input resize-none ${errors.competitionDetails && touched.competitionDetails ? 'input-error' : ''}`}
+													/>
+													{errors.competitionDetails && touched.competitionDetails && (
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+															<AlertCircle className='w-3.5 h-3.5' /> {errors.competitionDetails}
+														</p>
+													)}
+												</div>
+
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
 														<Upload className='w-3.5 h-3.5' />
-														<span>Upload Certificate PDF</span>
+														<span>{formData.competitionFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
 															onChange={(e) =>
-																handlePdfChange(e, 'competitionFileName', 'competitionFileDataUrl')
+																handlePdfChange(
+																	e,
+																	'competitionFileName',
+																	'competitionFileDataUrl',
+																	'competitionFile',
+																)
 															}
 															className='sr-only'
 														/>
@@ -2132,7 +2060,9 @@ export default function Home() {
 																<FileCheck className='w-4 h-4' /> {formData.competitionFileName}
 															</span>
 														) : (
-															'No PDF chosen (Max 15MB)'
+															<span className='text-slate-500'>
+																Upload certificate PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															</span>
 														)}
 													</span>
 													{formData.competitionFileName && (
@@ -2150,6 +2080,11 @@ export default function Home() {
 														</button>
 													)}
 												</div>
+												{errors.competitionFile && touched.competitionFile && (
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+														<AlertCircle className='w-3.5 h-3.5' /> {errors.competitionFile}
+													</p>
+												)}
 											</div>
 										)}
 									</div>
@@ -2182,25 +2117,31 @@ export default function Home() {
 									<div className='section-container space-y-3'>
 										<div className='flex items-center justify-between flex-wrap gap-2'>
 											<div>
-												<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-													13. Technical / Co-Curricular Activities, if any
-												</label>
-												<span className='text-xs text-slate-500'>
-													Mention the activity, event, and your role, and upload certificate in PDF.
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+														13. Technical / Co-Curricular Activities, if any
+													</label>
+													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+														Note:- Optional for first year cadets.
+													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-0.5'>
+													Mention the activity, event, and your role, and upload certificate in PDF (compulsory if selected).
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
 												<button
 													type='button'
-													onClick={() =>
+													onClick={() => {
 														setFormData((prev) => ({
 															...prev,
 															hasActivities: false,
 															activityDetails: '',
 															activityFileName: '',
 															activityFileDataUrl: '',
-														}))
-													}
+														}));
+														setErrors((prev) => ({ ...prev, activityDetails: '', activityFile: '' }));
+													}}
 													className={`na-toggle-btn ${
 														!formData.hasActivities
 															? 'bg-[#0e2544] text-white shadow-xs'
@@ -2223,28 +2164,39 @@ export default function Home() {
 
 										{formData.hasActivities && (
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
-												<textarea
-													name='activityDetails'
-													rows={2}
-													value={formData.activityDetails}
-													onChange={handleChange}
-													placeholder='Activity / Workshop, Organizing Body, Role & Contributions...'
-													className='form-input resize-none'
-												/>
-												{errors.activityDetails && touched.activityDetails && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.activityDetails}
-													</p>
-												)}
+												<div>
+													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+														Activity & Contribution Details <span className='text-red-600'>* (Compulsory)</span>
+													</label>
+													<textarea
+														name='activityDetails'
+														rows={2}
+														value={formData.activityDetails}
+														onChange={handleChange}
+														placeholder='Activity / Workshop, Organizing Body, Role & Contributions...'
+														className={`form-input resize-none ${errors.activityDetails && touched.activityDetails ? 'input-error' : ''}`}
+													/>
+													{errors.activityDetails && touched.activityDetails && (
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+															<AlertCircle className='w-3.5 h-3.5' /> {errors.activityDetails}
+														</p>
+													)}
+												</div>
+
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
 														<Upload className='w-3.5 h-3.5' />
-														<span>Upload Certificate PDF</span>
+														<span>{formData.activityFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
 															onChange={(e) =>
-																handlePdfChange(e, 'activityFileName', 'activityFileDataUrl')
+																handlePdfChange(
+																	e,
+																	'activityFileName',
+																	'activityFileDataUrl',
+																	'activityFile',
+																)
 															}
 															className='sr-only'
 														/>
@@ -2255,7 +2207,9 @@ export default function Home() {
 																<FileCheck className='w-4 h-4' /> {formData.activityFileName}
 															</span>
 														) : (
-															'No PDF chosen (Max 15MB)'
+															<span className='text-slate-500'>
+																Upload certificate PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															</span>
 														)}
 													</span>
 													{formData.activityFileName && (
@@ -2273,6 +2227,11 @@ export default function Home() {
 														</button>
 													)}
 												</div>
+												{errors.activityFile && touched.activityFile && (
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+														<AlertCircle className='w-3.5 h-3.5' /> {errors.activityFile}
+													</p>
+												)}
 											</div>
 										)}
 									</div>
@@ -2281,25 +2240,31 @@ export default function Home() {
 									<div className='section-container space-y-3'>
 										<div className='flex items-center justify-between flex-wrap gap-2'>
 											<div>
-												<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-													14. Major Achievements / Awards, if any
-												</label>
-												<span className='text-xs text-slate-500'>
-													Mention the achievement and upload the certificate / proof in PDF format.
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+														14. Major Achievements / Awards, if any
+													</label>
+													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+														Note:- Optional for first year cadets.
+													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-0.5'>
+													Mention the achievement & upload certificate / proof in PDF (compulsory if selected).
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
 												<button
 													type='button'
-													onClick={() =>
+													onClick={() => {
 														setFormData((prev) => ({
 															...prev,
 															hasAchievements: false,
 															achievementDetails: '',
 															achievementFileName: '',
 															achievementFileDataUrl: '',
-														}))
-													}
+														}));
+														setErrors((prev) => ({ ...prev, achievementDetails: '', achievementFile: '' }));
+													}}
 													className={`na-toggle-btn ${
 														!formData.hasAchievements
 															? 'bg-[#0e2544] text-white shadow-xs'
@@ -2324,28 +2289,39 @@ export default function Home() {
 
 										{formData.hasAchievements && (
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
-												<textarea
-													name='achievementDetails'
-													rows={2}
-													value={formData.achievementDetails}
-													onChange={handleChange}
-													placeholder='Award / Honor Title, Awarding Authority, Year, Category...'
-													className='form-input resize-none'
-												/>
-												{errors.achievementDetails && touched.achievementDetails && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.achievementDetails}
-													</p>
-												)}
+												<div>
+													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+														Achievement & Award Details <span className='text-red-600'>* (Compulsory)</span>
+													</label>
+													<textarea
+														name='achievementDetails'
+														rows={2}
+														value={formData.achievementDetails}
+														onChange={handleChange}
+														placeholder='Award / Honor Title, Awarding Authority, Year, Category...'
+														className={`form-input resize-none ${errors.achievementDetails && touched.achievementDetails ? 'input-error' : ''}`}
+													/>
+													{errors.achievementDetails && touched.achievementDetails && (
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+															<AlertCircle className='w-3.5 h-3.5' /> {errors.achievementDetails}
+														</p>
+													)}
+												</div>
+
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
 														<Upload className='w-3.5 h-3.5' />
-														<span>Upload Award Proof PDF</span>
+														<span>{formData.achievementFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
 															onChange={(e) =>
-																handlePdfChange(e, 'achievementFileName', 'achievementFileDataUrl')
+																handlePdfChange(
+																	e,
+																	'achievementFileName',
+																	'achievementFileDataUrl',
+																	'achievementFile',
+																)
 															}
 															className='sr-only'
 														/>
@@ -2356,7 +2332,9 @@ export default function Home() {
 																<FileCheck className='w-4 h-4' /> {formData.achievementFileName}
 															</span>
 														) : (
-															'No PDF chosen (Max 15MB)'
+															<span className='text-slate-500'>
+																Upload award proof PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															</span>
 														)}
 													</span>
 													{formData.achievementFileName && (
@@ -2374,6 +2352,11 @@ export default function Home() {
 														</button>
 													)}
 												</div>
+												{errors.achievementFile && touched.achievementFile && (
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+														<AlertCircle className='w-3.5 h-3.5' /> {errors.achievementFile}
+													</p>
+												)}
 											</div>
 										)}
 									</div>
@@ -2382,26 +2365,31 @@ export default function Home() {
 									<div className='section-container space-y-3'>
 										<div className='flex items-center justify-between flex-wrap gap-2'>
 											<div>
-												<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-													15. Leadership / Coordinator Positions Held, if any
-												</label>
-												<span className='text-xs text-slate-500'>
-													Mention position, organisation/club/event, duration, and responsibilities
-													held.
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+														15. Leadership / Coordinator Positions Held, if any
+													</label>
+													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+														Note:- Optional for first year cadets.
+													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-0.5'>
+													Mention position, organisation/club/event, duration, and responsibilities held.
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
 												<button
 													type='button'
-													onClick={() =>
+													onClick={() => {
 														setFormData((prev) => ({
 															...prev,
 															hasLeadership: false,
 															leadershipDetails: '',
 															leadershipFileName: '',
 															leadershipFileDataUrl: '',
-														}))
-													}
+														}));
+														setErrors((prev) => ({ ...prev, leadershipDetails: '' }));
+													}}
 													className={`na-toggle-btn ${
 														!formData.hasLeadership
 															? 'bg-[#0e2544] text-white shadow-xs'
@@ -2424,19 +2412,24 @@ export default function Home() {
 
 										{formData.hasLeadership && (
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
-												<textarea
-													name='leadershipDetails'
-													rows={3}
-													value={formData.leadershipDetails}
-													onChange={handleChange}
-													placeholder='Position Held (e.g. Lead, Secretary, Student Rep, Club Coordinator), Organisation/Club, Duration/Tenure, Key Responsibilities...'
-													className='form-input resize-none'
-												/>
-												{errors.leadershipDetails && touched.leadershipDetails && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.leadershipDetails}
-													</p>
-												)}
+												<div>
+													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+														Leadership Role Details <span className='text-red-600'>* (Compulsory)</span>
+													</label>
+													<textarea
+														name='leadershipDetails'
+														rows={3}
+														value={formData.leadershipDetails}
+														onChange={handleChange}
+														placeholder='Position Held (e.g. Lead, Secretary, Student Rep, Club Coordinator), Organisation/Club, Duration/Tenure, Key Responsibilities...'
+														className={`form-input resize-none ${errors.leadershipDetails && touched.leadershipDetails ? 'input-error' : ''}`}
+													/>
+													{errors.leadershipDetails && touched.leadershipDetails && (
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+															<AlertCircle className='w-3.5 h-3.5' /> {errors.leadershipDetails}
+														</p>
+													)}
+												</div>
 											</div>
 										)}
 									</div>
@@ -2609,7 +2602,7 @@ export default function Home() {
 												htmlFor='resumeInput'
 												className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
 												19. Upload Detailed Resume / CV (PDF){' '}
-												<span className='text-red-600'>* (Compulsory)</span>
+												<span className='text-red-600'>*</span>
 											</label>
 											<p className='text-xs text-slate-600 mt-1 leading-relaxed'>
 												Upload your latest CV/resume in PDF format. All uploaded proofs and
