@@ -92,6 +92,7 @@ export interface FormData {
 	customInterest: string;
 
 	// Section 5: Supporting Information (Q19)
+	hasResume: boolean;
 	resumeName: string;
 	resumeDataUrl?: string;
 
@@ -156,6 +157,7 @@ const INITIAL_STATE: FormData = {
 	areasOfInterest: [],
 	customInterest: '',
 
+	hasResume: true,
 	resumeName: '',
 	resumeDataUrl: '',
 
@@ -195,12 +197,17 @@ const SUGGESTED_INTERESTS = [
 ];
 
 const SECTIONS = [
-	{ id: 1, title: 'Cadet Profile', icon: User, badge: 'Q1–Q7' },
-	{ id: 2, title: 'Academic & Research', icon: GraduationCap, badge: 'Q8–Q12' },
-	{ id: 3, title: 'Co-Curricular & Leadership', icon: Award, badge: 'Q13–Q15' },
-	{ id: 4, title: 'Innovation & Problem Solving', icon: Lightbulb, badge: 'Q16–Q18' },
-	{ id: 5, title: 'Supporting Docs', icon: FileText, badge: 'Q19' },
-	{ id: 6, title: 'Declaration', icon: ShieldCheck, badge: 'Q20' },
+	{ id: 1, title: 'Cadet Profile', shortTitle: 'Profile', icon: User, badge: 'Q1–Q7' },
+	{
+		id: 2,
+		title: 'Academic & Research',
+		shortTitle: 'Academic',
+		icon: GraduationCap,
+		badge: 'Q8–Q12',
+	},
+	{ id: 3, title: 'Co-Curricular', shortTitle: 'Activities', icon: Award, badge: 'Q13–Q15' },
+	{ id: 4, title: 'Innovation', shortTitle: 'Innovation', icon: Lightbulb, badge: 'Q16–Q18' },
+	{ id: 5, title: 'Declaration', shortTitle: 'Declaration', icon: ShieldCheck, badge: 'Q19–Q20' },
 ];
 
 // Helper to merge all uploaded PDFs into a single unified master PDF
@@ -262,6 +269,7 @@ export default function Home() {
 	const [errors, setErrors] = useState<{ [key: string]: string }>({});
 	const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
 	const [currentStep, setCurrentStep] = useState<number>(1);
+	const [visitedSteps, setVisitedSteps] = useState<number[]>([1]);
 	const [submitted, setSubmitted] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [submittedRefId, setSubmittedRefId] = useState('');
@@ -362,18 +370,17 @@ export default function Home() {
 			case 'cgpa': {
 				if (!isFirstYear) {
 					const trimmed = typeof value === 'string' ? value.trim() : '';
-					if (!trimmed) return 'Current CGPA is required for 2nd–4th/PG students.';
+					if (!trimmed) return 'Current CGPA is required for 2nd–4th/PG cadets.';
 				}
 				return '';
 			}
 			case 'photo': {
-				if (!formData.photoName)
-					return 'Passport size photo is compulsory. Please select an image.';
+				if (!formData.photoName) return 'Passport size photo is required. Please select an image.';
 				return '';
 			}
 			case 'resume': {
-				if (!formData.resumeName)
-					return 'Detailed Resume / CV (PDF) is compulsory. Please upload a PDF file.';
+				if (formData.hasResume && !formData.resumeName)
+					return 'Please upload your Resume / CV (PDF), or select Not Applicable (N/A).';
 				return '';
 			}
 			case 'declarationAccepted': {
@@ -531,7 +538,7 @@ export default function Home() {
 		}
 	};
 
-	// Pure state-based validator for SSR and conditional rendering
+	// Pure state-based validator for SSR, Stepper status and conditional rendering
 	const isStepComplete = (stepNumber: number): boolean => {
 		if (stepNumber === 1) {
 			const nameErr = validateField('cadetName', formData.cadetName);
@@ -546,15 +553,36 @@ export default function Home() {
 				const cgpaErr = validateField('cgpa', formData.cgpa);
 				if (cgpaErr) return false;
 			}
-			if (formData.hasJournalPub && (!formData.journalDetails.trim() || !formData.journalFileDataUrl)) return false;
-			if (formData.hasBookChapter && (!formData.bookChapterDetails.trim() || !formData.bookChapterFileDataUrl)) return false;
-			if (formData.hasPatents && (!formData.patentDetails.trim() || !formData.patentFileDataUrl)) return false;
-			if (formData.hasCompetitions && (!formData.competitionDetails.trim() || !formData.competitionFileDataUrl)) return false;
+			if (
+				formData.hasJournalPub &&
+				(!formData.journalDetails.trim() || !formData.journalFileDataUrl)
+			)
+				return false;
+			if (
+				formData.hasBookChapter &&
+				(!formData.bookChapterDetails.trim() || !formData.bookChapterFileDataUrl)
+			)
+				return false;
+			if (formData.hasPatents && (!formData.patentDetails.trim() || !formData.patentFileDataUrl))
+				return false;
+			if (
+				formData.hasCompetitions &&
+				(!formData.competitionDetails.trim() || !formData.competitionFileDataUrl)
+			)
+				return false;
 			return true;
 		}
 		if (stepNumber === 3) {
-			if (formData.hasActivities && (!formData.activityDetails.trim() || !formData.activityFileDataUrl)) return false;
-			if (formData.hasAchievements && (!formData.achievementDetails.trim() || !formData.achievementFileDataUrl)) return false;
+			if (
+				formData.hasActivities &&
+				(!formData.activityDetails.trim() || !formData.activityFileDataUrl)
+			)
+				return false;
+			if (
+				formData.hasAchievements &&
+				(!formData.achievementDetails.trim() || !formData.achievementFileDataUrl)
+			)
+				return false;
 			if (formData.hasLeadership && !formData.leadershipDetails.trim()) return false;
 			return true;
 		}
@@ -562,23 +590,15 @@ export default function Home() {
 			return true;
 		}
 		if (stepNumber === 5) {
-			const resumeErr = validateField('resume', formData.resumeName);
-			return !resumeErr;
-		}
-		if (stepNumber === 6) {
-			return formData.declarationAccepted;
+			if (formData.hasResume && !formData.resumeName) return false;
+			const decErr = validateField('declarationAccepted', formData.declarationAccepted);
+			return !decErr;
 		}
 		return true;
 	};
 
-	// Check if step is accessible (pure check for render)
-	const canAccessStep = (targetStep: number): boolean => {
-		if (targetStep <= currentStep) return true;
-		for (let s = 1; s < targetStep; s++) {
-			if (!isStepComplete(s)) {
-				return false;
-			}
-		}
+	// Check if step is accessible (all steps are freely accessible)
+	const canAccessStep = (_targetStep: number): boolean => {
 		return true;
 	};
 
@@ -611,34 +631,34 @@ export default function Home() {
 
 			if (formData.hasJournalPub) {
 				if (!formData.journalDetails.trim()) {
-					newErrors.journalDetails = 'Please enter publication title and details (compulsory).';
+					newErrors.journalDetails = 'Please enter publication title and details.';
 				}
 				if (!formData.journalFileDataUrl) {
-					newErrors.journalFile = 'Please upload the publication PDF (compulsory).';
+					newErrors.journalFile = 'Please upload the publication PDF.';
 				}
 			}
 			if (formData.hasBookChapter) {
 				if (!formData.bookChapterDetails.trim()) {
-					newErrors.bookChapterDetails = 'Please enter book chapter title and details (compulsory).';
+					newErrors.bookChapterDetails = 'Please enter book chapter title and details.';
 				}
 				if (!formData.bookChapterFileDataUrl) {
-					newErrors.bookChapterFile = 'Please upload the book chapter PDF (compulsory).';
+					newErrors.bookChapterFile = 'Please upload the book chapter PDF.';
 				}
 			}
 			if (formData.hasPatents) {
 				if (!formData.patentDetails.trim()) {
-					newErrors.patentDetails = 'Please enter patent / IPR title and details (compulsory).';
+					newErrors.patentDetails = 'Please enter patent / IPR title and details.';
 				}
 				if (!formData.patentFileDataUrl) {
-					newErrors.patentFile = 'Please upload the certificate / filing PDF (compulsory).';
+					newErrors.patentFile = 'Please upload the certificate / filing PDF.';
 				}
 			}
 			if (formData.hasCompetitions) {
 				if (!formData.competitionDetails.trim()) {
-					newErrors.competitionDetails = 'Please enter event, year and achievement details (compulsory).';
+					newErrors.competitionDetails = 'Please enter event, year and achievement details.';
 				}
 				if (!formData.competitionFileDataUrl) {
-					newErrors.competitionFile = 'Please upload the competition certificate PDF (compulsory).';
+					newErrors.competitionFile = 'Please upload the competition certificate PDF.';
 				}
 			}
 		}
@@ -646,31 +666,30 @@ export default function Home() {
 		if (stepNumber === 3) {
 			if (formData.hasActivities) {
 				if (!formData.activityDetails.trim()) {
-					newErrors.activityDetails = 'Please enter technical activity details (compulsory).';
+					newErrors.activityDetails = 'Please enter technical activity details.';
 				}
 				if (!formData.activityFileDataUrl) {
-					newErrors.activityFile = 'Please upload the activity certificate PDF (compulsory).';
+					newErrors.activityFile = 'Please upload the activity certificate PDF.';
 				}
 			}
 			if (formData.hasAchievements) {
 				if (!formData.achievementDetails.trim()) {
-					newErrors.achievementDetails = 'Please enter achievement / award details (compulsory).';
+					newErrors.achievementDetails = 'Please enter achievement / award details.';
 				}
 				if (!formData.achievementFileDataUrl) {
-					newErrors.achievementFile = 'Please upload the award proof PDF (compulsory).';
+					newErrors.achievementFile = 'Please upload the award proof PDF.';
 				}
 			}
 			if (formData.hasLeadership && !formData.leadershipDetails.trim()) {
-				newErrors.leadershipDetails = 'Please provide details of the leadership position held (compulsory).';
+				newErrors.leadershipDetails = 'Please provide details of the leadership position held.';
 			}
 		}
 
 		if (stepNumber === 5) {
-			const resumeErr = validateField('resume', formData.resumeName);
-			if (resumeErr) newErrors.resume = resumeErr;
-		}
+			if (formData.hasResume && !formData.resumeName) {
+				newErrors.resume = 'Please upload your Resume / CV (PDF), or select Not Applicable (N/A).';
+			}
 
-		if (stepNumber === 6) {
 			const decErr = validateField('declarationAccepted', formData.declarationAccepted);
 			if (decErr) newErrors.declarationAccepted = decErr;
 		}
@@ -690,30 +709,7 @@ export default function Home() {
 	};
 
 	const handleStepClick = (targetStep: number) => {
-		if (targetStep <= currentStep) {
-			setCurrentStep(targetStep);
-			if (typeof window !== 'undefined') {
-				window.scrollTo({ top: 300, behavior: 'smooth' });
-			}
-			return;
-		}
-
-		// Check sequential steps
-		for (let s = 1; s < targetStep; s++) {
-			if (!validateStep(s)) {
-				setCurrentStep(s);
-				if (typeof window !== 'undefined') {
-					const firstError = document.querySelector(
-						'.input-error, [id^="cadetName"], [id^="regNumber"], [id^="photo"], [id^="resume"]',
-					);
-					if (firstError) {
-						firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-					}
-				}
-				return;
-			}
-		}
-
+		setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
 		setCurrentStep(targetStep);
 		if (typeof window !== 'undefined') {
 			window.scrollTo({ top: 300, behavior: 'smooth' });
@@ -721,25 +717,18 @@ export default function Home() {
 	};
 
 	const nextStep = () => {
-		if (validateStep(currentStep)) {
-			if (currentStep < 6) {
-				setCurrentStep((prev) => prev + 1);
-				if (typeof window !== 'undefined') {
-					window.scrollTo({ top: 300, behavior: 'smooth' });
-				}
-			}
-		} else {
+		if (currentStep < 5) {
+			setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
+			setCurrentStep((prev) => prev + 1);
 			if (typeof window !== 'undefined') {
-				const firstError = document.querySelector('.input-error');
-				if (firstError) {
-					firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-				}
+				window.scrollTo({ top: 300, behavior: 'smooth' });
 			}
 		}
 	};
 
 	const prevStep = () => {
 		if (currentStep > 1) {
+			setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
 			setCurrentStep((prev) => prev - 1);
 			if (typeof window !== 'undefined') {
 				window.scrollTo({ top: 300, behavior: 'smooth' });
@@ -749,7 +738,7 @@ export default function Home() {
 
 	const validateAll = () => {
 		let allValid = true;
-		for (let s = 1; s <= 6; s++) {
+		for (let s = 1; s <= 5; s++) {
 			if (!validateStep(s)) {
 				allValid = false;
 			}
@@ -760,11 +749,21 @@ export default function Home() {
 	const handleSubmit = async (e: FormEvent) => {
 		e.preventDefault();
 		if (!validateAll()) {
-			const firstErrorKey = Object.keys(errors)[0] || 'cadetName';
-			const el = document.getElementById(firstErrorKey);
-			if (el) {
-				el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			// Automatically navigate to the first incomplete/invalid step
+			for (let s = 1; s <= 5; s++) {
+				if (!isStepComplete(s)) {
+					setCurrentStep(s);
+					break;
+				}
 			}
+			setTimeout(() => {
+				const firstError = document.querySelector(
+					'.input-error, [id^="cadetName"], [id^="regNumber"], [id^="photo"], [id^="resume"], [id^="declarationAccepted"]',
+				);
+				if (firstError) {
+					firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				}
+			}, 80);
 			return;
 		}
 
@@ -869,6 +868,7 @@ export default function Home() {
 		setFormData(INITIAL_STATE);
 		setErrors({});
 		setTouched({});
+		setVisitedSteps([1]);
 		setCurrentStep(1);
 		setSubmitted(false);
 		try {
@@ -878,68 +878,107 @@ export default function Home() {
 	};
 
 	return (
-		<main className='relative w-full min-h-screen py-4 sm:py-8 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start bg-slate-100'>
+		<main className='relative w-full min-h-screen py-6 sm:py-10 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start bg-[#f0f4f8]'>
 			{/* Form Shell / Center Card */}
-			<div className='relative z-10 w-full max-w-4xl mb-14 mt-1 sm:mt-2'>
-				<div className='clean-card overflow-hidden'>
+			<div className='relative z-10 w-full max-w-4xl mb-16 mt-1 sm:mt-2'>
+				<div className='clean-card overflow-hidden bg-white'>
 					{/* Official Banner Header */}
-					<div className='w-full bg-[#f6f9fc] border-b border-slate-200 p-2 sm:p-3 flex justify-center'>
+					<div className='w-full bg-[#f8fafc] border-b border-slate-200/90 p-2.5 sm:p-3.5 flex justify-center'>
 						<div className='w-full max-w-[1024px] relative'>
 							<Image
-								src='/iic-banner.png'
+								src='/iic-banner-2026.webp'
 								alt='IMU Kolkata Campus - Institution Innovation Council (IIC) 2026-27'
-								width={3031}
-								height={562}
+								width={1024}
+								height={341}
 								unoptimized
 								priority
-								className='w-full h-auto object-contain mx-auto rounded-lg'
+								fetchPriority='high'
+								className='w-full h-auto object-contain mx-auto rounded-xl shadow-2xs'
 								style={{ imageRendering: '-webkit-optimize-contrast' }}
 							/>
 						</div>
 					</div>
 
 					{/* Title & Official Notice Strip */}
-					<div className='px-5 sm:px-8 py-5 border-b border-slate-100 bg-white'>
-						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+					<div className='px-6 sm:px-9 py-6 sm:py-7 border-b border-slate-100 bg-white'>
+						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3.5'>
 							<div>
-								<div className='flex items-center gap-2 mb-1'>
-									<span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300'>
+								<div className='flex items-center gap-2 mb-1.5'>
+									<span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs'>
 										Academic Year 2026–27
 									</span>
-									<span className='text-xs font-semibold text-slate-500'>IMU Kolkata Campus</span>
+									<span className='text-xs font-semibold text-slate-500 uppercase tracking-wider'>
+										IMU Kolkata Campus
+									</span>
 								</div>
-								<h1 className='text-lg sm:text-2xl font-bold text-[#0e2544] uppercase tracking-wide leading-tight'>
-									IIC Student Council – Student Enrollment Form
+								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-extrabold text-[#0e2544] uppercase tracking-wide leading-tight font-heading'>
+									Institution’s Innovation Council (IIC) – Cadet Enrollment Form
 								</h1>
 							</div>
 							{draftSaved && (
-								<div className='flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 font-semibold self-start sm:self-auto animate-pulse'>
+								<div className='flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200 font-semibold self-start sm:self-auto shadow-2xs animate-pulse'>
 									<Check className='w-3.5 h-3.5' /> Auto-saved
 								</div>
 							)}
 						</div>
 
-						{/* Instructions to Students Banner */}
-						<div className='mt-4 p-3.5 sm:p-4 rounded-xl bg-sky-50/90 border border-sky-200/90 text-sky-950 flex items-start gap-3'>
-							<Info className='w-5 h-5 text-sky-700 flex-shrink-0 mt-0.5' />
-							<div className='text-xs sm:text-sm leading-relaxed space-y-1.5'>
-								<div className='flex items-center justify-between flex-wrap gap-2'>
-									<strong className='font-bold text-sky-900 uppercase tracking-wide text-xs'>
-										Instructions to Students:
-									</strong>
-									<span className='inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full text-[11px] shadow-xs'>
-										<span className='text-red-600 font-extrabold text-sm leading-none'>*</span> Fields marked with asterisk are mandatory
-									</span>
+						{/* Instructions to cadets Banner */}
+						<div className='mt-5 p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-50 via-sky-50/40 to-slate-50 border border-slate-200/90 shadow-xs'>
+							<div className='flex items-center gap-2.5 pb-3.5 mb-3.5 border-b border-slate-200/70'>
+								<div className='w-7 h-7 rounded-lg bg-[#0e2544] text-white flex items-center justify-center flex-shrink-0 shadow-xs'>
+									<Info className='w-4 h-4 text-sky-200' />
 								</div>
-								<p>
-									Please provide accurate and concise information. Answer all applicable questions.
-									For questions that are not applicable, select{' '}
-									<span className='font-bold text-[#0e2544] bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300'>
-										“Not Applicable (N/A)”
-									</span>
-									. Fields marked with an asterisk (<span className='text-red-600 font-bold'>*</span>) are mandatory. All uploaded PDF documents and proofs will be automatically merged into a single PDF and mailed to the registered email address of the student.
-								</p>
+								<h2 className='font-bold text-[#0e2544] uppercase tracking-wider text-xs sm:text-sm font-heading'>
+									Important Notice / Instructions:
+								</h2>
 							</div>
+							<ol className='space-y-3 text-slate-700 text-xs sm:text-[13.5px] leading-relaxed'>
+								<li className='flex items-start gap-3'>
+									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
+										1
+									</span>
+									<span className='flex-1 font-medium'>
+										Fields marked with an asterisk (*) are mandatory and must be completed.
+									</span>
+								</li>
+								<li className='flex items-start gap-3'>
+									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
+										2
+									</span>
+									<span className='flex-1 font-medium'>
+										Cadets are advised to ensure that all information provided is accurate,
+										complete, and supported by valid documents before submission.
+									</span>
+								</li>
+								<li className='flex items-start gap-3'>
+									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
+										3
+									</span>
+									<span className='flex-1 font-medium'>
+										The Enrollment Form and all supporting documents/proofs submitted will be
+										compiled into a single PDF and sent to the registered email ID.
+									</span>
+								</li>
+								<li className='flex items-start gap-3'>
+									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
+										4
+									</span>
+									<span className='flex-1 font-medium'>
+										Cadets are required to verify all their details and entries made in the PDF
+										received through their registered email ID.
+									</span>
+								</li>
+								<li className='flex items-start gap-3'>
+									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
+										5
+									</span>
+									<span className='flex-1 font-medium'>
+										After verification, sign in the space provided and self-attest the
+										PDF/documents, and submit the duly verified documents in person to the concerned
+										Faculty In-charge.
+									</span>
+								</li>
+							</ol>
 						</div>
 					</div>
 
@@ -951,15 +990,15 @@ export default function Home() {
 							</div>
 							<div>
 								<span className='text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100 px-3 py-1 rounded-full border border-emerald-300'>
-									Official Record Created
+									Enrollment form submitted
 								</span>
 								<h2 className='text-xl sm:text-3xl font-bold text-[#0e2544] uppercase tracking-tight mt-3'>
-									Enrollment Application Submitted
+									IIC Cadet Council 2026-27
 								</h2>
 								<p className='text-sm sm:text-base text-slate-600 mt-2 max-w-lg mx-auto leading-relaxed'>
 									Thank you, <span className='font-bold text-[#0e2544]'>{formData.cadetName}</span>.
 									Your enrollment application and credentials for the{' '}
-									<strong>IIC Student Council 2026–27</strong> have been recorded successfully.
+									<strong>IIC Student Council 2026–27</strong> have been submitted successfully.
 								</p>
 							</div>
 
@@ -1037,9 +1076,12 @@ export default function Home() {
 									</div>
 
 									<div className='p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200 text-emerald-900'>
-										<span className='font-bold block'>✓ Unified Master PDF Sent to Google Drive & Email:</span>
+										<span className='font-bold block'>
+											✓ Unified Master PDF Sent to Google Drive & Email:
+										</span>
 										<span className='text-[11px] text-emerald-800'>
-											All proofs and certificates have been automatically compiled into a single master document.
+											All proofs and certificates have been automatically compiled into a single
+											master document.
 										</span>
 									</div>
 
@@ -1138,107 +1180,92 @@ export default function Home() {
 					) : (
 						/* MAIN ENROLLMENT FORM */
 						<form onSubmit={handleSubmit} noValidate className='bg-white'>
-							{/* DESKTOP-ONLY CAPSULE STEPPER (>= 768px) */}
-							<div className='hidden md:block border-b border-slate-200 bg-slate-50/80 px-6 py-4'>
-								<div className='flex items-center justify-between gap-2 max-w-3xl mx-auto'>
-									{SECTIONS.map((sec, idx) => {
-										const Icon = sec.icon;
+							{/* 5-STEP RESPONSIVE TAB BAR (VISIBLE ON ALL SCREENS WITHOUT SCROLLING) */}
+							<div className='border-b border-slate-200 bg-slate-50/80 px-2 sm:px-6 py-2.5 sm:py-3.5'>
+								<div className='grid grid-cols-5 gap-1 sm:gap-2 max-w-4xl mx-auto w-full'>
+									{SECTIONS.map((sec) => {
 										const isCurrent = currentStep === sec.id;
-										const isCompleted = currentStep > sec.id;
-										const isLocked = !canAccessStep(sec.id) && currentStep < sec.id;
+										const isVisited = visitedSteps.includes(sec.id);
+										const isComplete = isStepComplete(sec.id);
+										const isUnfinished = isVisited && !isComplete && !isCurrent;
+										const isCompleted = isVisited && isComplete && !isCurrent;
+										const isUnvisited = !isVisited && !isCurrent;
 
 										return (
-											<React.Fragment key={sec.id}>
-												{/* Capsule Pill Button */}
-												<button
-													type='button'
-													onClick={() => handleStepClick(sec.id)}
-													title={
-														isLocked ? 'Fill previous section to unlock' : `Go to ${sec.title}`
-													}
-													className={`group relative flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold transition-all ${
-														isCurrent
-															? 'bg-[#0e2544] text-white shadow-md ring-2 ring-sky-500/30 scale-105'
+											<button
+												key={sec.id}
+												type='button'
+												onClick={() => handleStepClick(sec.id)}
+												title={
+													isCurrent
+														? `Current Section: ${sec.title}`
+														: isUnfinished
+															? `${sec.title} (Unfinished / Incomplete)`
 															: isCompleted
-																? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer'
-																: isLocked
-																	? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-75'
-																	: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer'
-													}`}>
-													<div
-														className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-															isCurrent
-																? 'bg-sky-500 text-white'
+																? `${sec.title} (Completed)`
+																: `${sec.title} (Upcoming)`
+												}
+												className={`group relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+													isCurrent
+														? 'bg-[#0e2544] text-white shadow-md ring-2 ring-sky-500/30 scale-[1.02]'
+														: isUnfinished
+															? 'bg-amber-50 text-amber-950 border border-amber-300 hover:bg-amber-100/90 shadow-2xs'
+															: isCompleted
+																? 'bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+																: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-2xs'
+												}`}>
+												<div
+													className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+														isCurrent
+															? 'bg-sky-500 text-white'
+															: isUnfinished
+																? 'bg-amber-500 text-white'
 																: isCompleted
 																	? 'bg-emerald-600 text-white'
 																	: 'bg-slate-200 text-slate-600'
-														}`}>
-														{isCompleted ? <Check className='w-3 h-3' /> : sec.id}
-													</div>
+													}`}>
+													{isCurrent || isUnvisited ? (
+														sec.id
+													) : isUnfinished ? (
+														<AlertCircle className='w-3 h-3' />
+													) : (
+														<Check className='w-3 h-3' />
+													)}
+												</div>
 
-													<span className='whitespace-nowrap'>{sec.title}</span>
-
-													{isLocked && <Lock className='w-3 h-3 text-slate-400' />}
-												</button>
-
-												{/* Connecting Line between capsules */}
-												{idx < SECTIONS.length - 1 && (
-													<div
-														className={`flex-1 h-0.5 rounded transition-all ${
-															currentStep > sec.id ? 'bg-emerald-400' : 'bg-slate-200'
-														}`}
-													/>
-												)}
-											</React.Fragment>
+												<span className='truncate text-[10px] sm:text-xs tracking-tight text-center font-medium sm:font-bold'>
+													<span className='sm:hidden'>{sec.shortTitle}</span>
+													<span className='hidden sm:inline'>{sec.title}</span>
+												</span>
+											</button>
 										);
 									})}
 								</div>
 							</div>
 
-							{/* MOBILE-ONLY STEP PROGRESS BAR (< 768px) */}
-							<div className='block md:hidden border-b border-slate-200 bg-slate-50 p-3.5'>
-								<div className='flex items-center justify-between text-xs font-bold text-[#0e2544] mb-1.5'>
-									<span className='flex items-center gap-2'>
-										<span className='w-5 h-5 rounded-full bg-[#0e2544] text-white flex items-center justify-center text-[10px] font-bold'>
-											{currentStep}
-										</span>
-										<span>{SECTIONS[currentStep - 1]?.title}</span>
-									</span>
-									<span className='text-slate-500 text-[11px] font-semibold'>
-										Step {currentStep} of 6
-									</span>
-								</div>
-								<div className='w-full bg-slate-200 h-2 rounded-full overflow-hidden'>
-									<div
-										className='bg-sky-600 h-full transition-all duration-300'
-										style={{ width: `${(currentStep / 6) * 100}%` }}
-									/>
-								</div>
-							</div>
-
 							{/* FORM BODY CONTAINER */}
-							<div className='p-4 sm:p-8 space-y-8'>
+							<div className='p-6 sm:p-9 lg:p-10 space-y-8'>
 								{/* ======================================================== */}
 								{/* SECTION 1: CADET PROFILE & DEMOGRAPHICS (Q1 - Q7 + PHOTO) */}
 								{/* ======================================================== */}
 								<section
 									id='section-1'
-									className={`space-y-6 ${currentStep === 1 ? 'block' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
-										<div className='flex items-center gap-2.5'>
-											<div className='w-8 h-8 rounded-lg bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm'>
+									className={`space-y-7 ${currentStep === 1 ? 'block' : 'hidden'}`}>
+									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
+										<div className='flex items-center gap-3'>
+											<div className='w-9 h-9 rounded-xl bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
 												1
 											</div>
 											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide'>
+												<h2 className='text-lg sm:text-xl font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Cadet Profile & Academic Identity
 												</h2>
-												<p className='text-xs text-slate-500 font-medium'>
+												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
 													Questions 1 to 7 • Personal, enrollment, and official contact details
 												</p>
 											</div>
 										</div>
-										<span className='section-badge'>Section 1 of 6</span>
+										<span className='section-badge'>Section 1 of 5</span>
 									</div>
 
 									{/* Row 1: 1. Name of Cadet & 2. Year of Study */}
@@ -1246,8 +1273,8 @@ export default function Home() {
 										<div id='cadetName'>
 											<label
 												htmlFor='cadetNameInput'
-												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												1. Name of the Cadet <span className='text-red-600'>*</span>
+												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												1. Name of the Cadet <span className='text-red-600 font-bold'>*</span>
 											</label>
 											<input
 												type='text'
@@ -1261,8 +1288,8 @@ export default function Home() {
 												autoComplete='name'
 											/>
 											{errors.cadetName && touched.cadetName ? (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1'>
-													<AlertCircle className='w-3.5 h-3.5' /> {errors.cadetName}
+												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.cadetName}
 												</p>
 											) : (
 												<p className='text-xs text-slate-500 mt-1.5 font-medium'>
@@ -1274,15 +1301,15 @@ export default function Home() {
 										<div id='yearOfStudy'>
 											<label
 												htmlFor='yearOfStudySelect'
-												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												2. Year of Study <span className='text-red-600'>*</span>
+												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												2. Year of Study <span className='text-red-600 font-bold'>*</span>
 											</label>
 											<select
 												id='yearOfStudySelect'
 												name='yearOfStudy'
 												value={formData.yearOfStudy}
 												onChange={handleChange}
-												className='form-input cursor-pointer font-medium'>
+												className='form-input cursor-pointer font-medium h-[46px]'>
 												<option value='1st Year'>1st Year</option>
 												<option value='2nd Year'>2nd Year</option>
 												<option value='3rd Year'>3rd Year</option>
@@ -1300,13 +1327,10 @@ export default function Home() {
 											<div className='flex items-baseline justify-between gap-1 mb-2 flex-wrap'>
 												<label
 													htmlFor='regNumberInput'
-													className='text-xs font-bold uppercase tracking-wider text-[#0e2544]'>
-													3. {isFirstYear ? 'Roll No. / Serial No.' : 'University Registration / Roll Number'}{' '}
-													<span className='text-red-600'>*</span>
+													className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+													3. {isFirstYear ? '. Reg No/ Serial No.' : 'University Registration No'}{' '}
+													<span className='text-red-600 font-bold'>*</span>
 												</label>
-												<span className='text-[11px] font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded border border-sky-200'>
-													{isFirstYear ? '1st Year Serial' : 'Permanent Reg No.'}
-												</span>
 											</div>
 											<input
 												type='text'
@@ -1317,14 +1341,14 @@ export default function Home() {
 												onBlur={handleBlur}
 												placeholder={
 													isFirstYear
-														? 'Enter allotted Roll Number / Serial Number'
-														: 'Enter permanent university reg number'
+														? 'Enter allotted Reg No./ Serial Number'
+														: 'Enter permanent University Reg Number'
 												}
 												className={`form-input font-mono ${errors.regNumber && touched.regNumber ? 'input-error' : ''}`}
 											/>
 											{errors.regNumber && touched.regNumber ? (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1'>
-													<AlertCircle className='w-3.5 h-3.5' /> {errors.regNumber}
+												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.regNumber}
 												</p>
 											) : (
 												<p className='text-xs text-slate-500 mt-1.5 font-medium'>
@@ -1338,15 +1362,15 @@ export default function Home() {
 										<div id='semester'>
 											<label
 												htmlFor='semesterSelect'
-												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												4. Current Semester <span className='text-red-600'>*</span>
+												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												4. Current Semester <span className='text-red-600 font-bold'>*</span>
 											</label>
 											<select
 												id='semesterSelect'
 												name='semester'
 												value={formData.semester}
 												onChange={handleChange}
-												className='form-input cursor-pointer font-medium'>
+												className='form-input cursor-pointer font-medium h-[46px]'>
 												{SEMESTERS.map((sem) => (
 													<option key={sem} value={sem}>
 														{sem}
@@ -1364,15 +1388,16 @@ export default function Home() {
 										<div>
 											<label
 												htmlFor='department'
-												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												5. Department / Academic Program <span className='text-red-600'>*</span>
+												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												5. Department / Academic Program{' '}
+												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<select
 												id='department'
 												name='department'
 												value={formData.department}
 												onChange={handleChange}
-												className='form-input cursor-pointer font-medium h-[46px] sm:h-[42px]'>
+												className='form-input cursor-pointer font-medium h-[46px]'>
 												{DEPARTMENTS.map((dept) => (
 													<option key={dept} value={dept}>
 														{dept}
@@ -1382,10 +1407,10 @@ export default function Home() {
 										</div>
 
 										<div>
-											<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												Gender <span className='text-red-600'>*</span>
+											<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												Gender <span className='text-red-600 font-bold'>*</span>
 											</label>
-											<div className='flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 h-[46px] sm:h-[42px]'>
+											<div className='flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 h-[46px]'>
 												{['Male', 'Female'].map((g) => (
 													<label
 														key={g}
@@ -1414,8 +1439,8 @@ export default function Home() {
 										<div id='email'>
 											<label
 												htmlFor='emailInput'
-												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												6. Email Address <span className='text-red-600'>*</span>
+												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												6. Email Address <span className='text-red-600 font-bold'>*</span>
 											</label>
 											<input
 												type='email'
@@ -1424,13 +1449,13 @@ export default function Home() {
 												value={formData.email}
 												onChange={handleChange}
 												onBlur={handleBlur}
-												placeholder='name@domain.com'
+												placeholder='Enter your email'
 												className={`form-input ${errors.email && touched.email ? 'input-error' : ''}`}
 												autoComplete='email'
 											/>
 											{errors.email && touched.email && (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1'>
-													<AlertCircle className='w-3.5 h-3.5' /> {errors.email}
+												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.email}
 												</p>
 											)}
 										</div>
@@ -1438,8 +1463,8 @@ export default function Home() {
 										<div id='phone'>
 											<label
 												htmlFor='phoneInput'
-												className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												7. Mobile Number <span className='text-red-600'>*</span>
+												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+												7. Mobile Number <span className='text-red-600 font-bold'>*</span>
 											</label>
 											<input
 												type='tel'
@@ -1453,21 +1478,23 @@ export default function Home() {
 												autoComplete='tel'
 											/>
 											{errors.phone && touched.phone && (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1'>
-													<AlertCircle className='w-3.5 h-3.5' /> {errors.phone}
+												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.phone}
 												</p>
 											)}
 										</div>
 									</div>
 
 									{/* Passport Size Photo Upload */}
-									<div id='photo' className='p-4 rounded-xl border border-slate-200 bg-slate-50/50'>
+									<div
+										id='photo'
+										className='p-5 rounded-2xl border border-slate-200/90 bg-slate-50/70'>
 										<label
 											htmlFor='photoInput'
-											className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-											Passport Size Photo <span className='text-red-600'>* (Compulsory)</span>
+											className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+											Passport Size Photo <span className='text-red-600 font-bold'>*</span>
 										</label>
-										<p className='text-xs text-slate-500 mb-3'>
+										<p className='text-xs text-slate-500 mb-3.5'>
 											Upload a clear passport size photograph (PNG or JPG).
 										</p>
 
@@ -1477,17 +1504,17 @@ export default function Home() {
 												<img
 													src={formData.photoDataUrl}
 													alt='Cadet Preview'
-													className='w-16 h-16 rounded-xl object-cover border-2 border-slate-300 shadow-sm flex-shrink-0'
+													className='w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-slate-300 shadow-xs flex-shrink-0'
 												/>
 											) : (
-												<div className='w-16 h-16 rounded-xl bg-slate-200 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 text-[10px] font-bold flex-shrink-0'>
-													<User className='w-6 h-6 mb-0.5 text-slate-400' />
+												<div className='w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-slate-200 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 text-[10px] font-bold flex-shrink-0'>
+													<User className='w-7 h-7 mb-0.5 text-slate-400' />
 													PHOTO
 												</div>
 											)}
 											<div className='flex-1 min-w-[200px]'>
-												<label className='inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs transition-all'>
-													<Upload className='w-3.5 h-3.5' />
+												<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all'>
+													<Upload className='w-4 h-4' />
 													<span>{formData.photoName ? 'Change Photo' : 'Select Photo'}</span>
 													<input
 														type='file'
@@ -1498,10 +1525,10 @@ export default function Home() {
 														className='sr-only'
 													/>
 												</label>
-												<p className='text-xs text-slate-600 font-medium truncate mt-1.5'>
+												<p className='text-xs text-slate-600 font-medium truncate mt-2'>
 													{formData.photoName ? (
 														<span className='font-bold text-emerald-700 flex items-center gap-1'>
-															<Check className='w-3.5 h-3.5' /> {formData.photoName}
+															<Check className='w-4 h-4' /> {formData.photoName}
 														</span>
 													) : (
 														'Accepts JPG, PNG, WEBP up to 15MB'
@@ -1510,8 +1537,8 @@ export default function Home() {
 											</div>
 										</div>
 										{errors.photo && touched.photo && (
-											<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1'>
-												<AlertCircle className='w-3.5 h-3.5' /> {errors.photo}
+											<p className='text-xs font-semibold text-red-600 mt-2.5 flex items-center gap-1.5'>
+												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.photo}
 											</p>
 										)}
 									</div>
@@ -1522,17 +1549,17 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-2'
-									className={`space-y-6 ${currentStep === 2 ? 'block' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
-										<div className='flex items-center gap-2.5'>
-											<div className='w-8 h-8 rounded-lg bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm'>
+									className={`space-y-7 ${currentStep === 2 ? 'block' : 'hidden'}`}>
+									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
+										<div className='flex items-center gap-3'>
+											<div className='w-9 h-9 rounded-xl bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
 												2
 											</div>
 											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide'>
+												<h2 className='text-lg sm:text-xl font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Academic & Research Profile
 												</h2>
-												<p className='text-xs text-slate-500 font-medium'>
+												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
 													Questions 8 to 12 • CGPA, Publications, IPR & Competitions
 												</p>
 											</div>
@@ -1542,18 +1569,19 @@ export default function Home() {
 
 									{/* Question 8: Current CGPA */}
 									<div id='cgpa' className='section-container'>
-										<div className='flex items-baseline justify-between mb-2 flex-wrap gap-2'>
+										<div className='flex items-baseline justify-between mb-2.5 flex-wrap gap-2'>
 											<label
 												htmlFor='cgpaInput'
-												className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
-												8. Current CGPA {!isFirstYear && <span className='text-red-600'>*</span>}
+												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												8. Current CGPA{' '}
+												{!isFirstYear && <span className='text-red-600 font-bold'>*</span>}
 											</label>
-											<span className='text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200'>
+											<span className='text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-0.5 rounded-full border border-slate-200'>
 												{isFirstYear ? 'Exempted (1st Year)' : 'Required'}
 											</span>
 										</div>
 
-										<div className='grid grid-cols-1 sm:grid-cols-2 gap-4 items-start'>
+										<div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 items-start'>
 											<div>
 												<input
 													type='text'
@@ -1577,38 +1605,37 @@ export default function Home() {
 													}`}
 												/>
 												{errors.cgpa && touched.cgpa && !isFirstYear && (
-													<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.cgpa}
+													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.cgpa}
 													</p>
 												)}
 											</div>
-											<div className='text-xs text-slate-700 bg-amber-50/80 p-3 rounded-lg border border-amber-200'>
+											<div className='text-xs text-slate-700 bg-amber-50 border border-amber-200/90 p-3.5 rounded-xl leading-relaxed'>
 												<span className='font-bold text-amber-900 block mb-0.5'>
-													Note:- Optional for first year cadets.
+													Note:- Not applicable for first semester cadets.
 												</span>
-												1st Year cadets do not possess university CGPA results yet. This field is automatically disabled.
 											</div>
 										</div>
 									</div>
 
 									{/* Question 9: Journal Publications */}
-									<div className='section-container space-y-3'>
-										<div className='flex items-center justify-between flex-wrap gap-2'>
+									<div className='section-container space-y-4'>
+										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 														9. Journal Publications, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
-														Note:- Optional for first year cadets.
+													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
+														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-0.5'>
-													Mention publication details & upload authorship proof PDF (compulsory if selected).
+												<span className='text-xs text-slate-500 block mt-1'>
+													Mention publication details & upload authorship proof PDF (if selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
 												<button
 													type='button'
 													onClick={() => {
@@ -1642,10 +1669,11 @@ export default function Home() {
 										</div>
 
 										{formData.hasJournalPub && (
-											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
-													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-														Paper Title & Publication Details <span className='text-red-600'>* (Compulsory)</span>
+													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+														Paper Title & Publication Details{' '}
+														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
 														name='journalDetails'
@@ -1656,15 +1684,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.journalDetails && touched.journalDetails ? 'input-error' : ''}`}
 													/>
 													{errors.journalDetails && touched.journalDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
-															<AlertCircle className='w-3.5 h-3.5' /> {errors.journalDetails}
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.journalDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
-														<Upload className='w-3.5 h-3.5' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4' />
 														<span>{formData.journalFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -1682,12 +1711,14 @@ export default function Home() {
 													</label>
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.journalFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4' /> {formData.journalFileName}
+															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
+																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+																{formData.journalFileName}
 															</span>
 														) : (
-															<span className='text-slate-500'>
-																Upload paper first page PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															<span className='text-slate-500 font-medium'>
+																Upload paper first page PDF{' '}
+																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -1701,14 +1732,14 @@ export default function Home() {
 																	journalFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1'>
+															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.journalFile && touched.journalFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.journalFile}
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.journalFile}
 													</p>
 												)}
 											</div>
@@ -1716,23 +1747,23 @@ export default function Home() {
 									</div>
 
 									{/* Question 10: Book Chapter Publications */}
-									<div className='section-container space-y-3'>
-										<div className='flex items-center justify-between flex-wrap gap-2'>
+									<div className='section-container space-y-4'>
+										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 														10. Book Chapter Publications, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
-														Note:- Optional for first year cadets.
+													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
+														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-0.5'>
-													Mention publication details & upload book chapter proof PDF (compulsory if selected).
+												<span className='text-xs text-slate-500 block mt-1'>
+													Mention publication details & upload book chapter proof PDF (if selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
 												<button
 													type='button'
 													onClick={() => {
@@ -1743,7 +1774,11 @@ export default function Home() {
 															bookChapterFileName: '',
 															bookChapterFileDataUrl: '',
 														}));
-														setErrors((prev) => ({ ...prev, bookChapterDetails: '', bookChapterFile: '' }));
+														setErrors((prev) => ({
+															...prev,
+															bookChapterDetails: '',
+															bookChapterFile: '',
+														}));
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasBookChapter
@@ -1766,10 +1801,10 @@ export default function Home() {
 										</div>
 
 										{formData.hasBookChapter && (
-											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
-													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-														Book & Chapter Details <span className='text-red-600'>* (Compulsory)</span>
+													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+														Book & Chapter Details <span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
 														name='bookChapterDetails'
@@ -1780,16 +1815,19 @@ export default function Home() {
 														className={`form-input resize-none ${errors.bookChapterDetails && touched.bookChapterDetails ? 'input-error' : ''}`}
 													/>
 													{errors.bookChapterDetails && touched.bookChapterDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
-															<AlertCircle className='w-3.5 h-3.5' /> {errors.bookChapterDetails}
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.bookChapterDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
-														<Upload className='w-3.5 h-3.5' />
-														<span>{formData.bookChapterFileName ? 'Change PDF' : 'Upload PDF'}</span>
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4' />
+														<span>
+															{formData.bookChapterFileName ? 'Change PDF' : 'Upload PDF'}
+														</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
@@ -1806,12 +1844,14 @@ export default function Home() {
 													</label>
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.bookChapterFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4' /> {formData.bookChapterFileName}
+															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
+																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+																{formData.bookChapterFileName}
 															</span>
 														) : (
-															<span className='text-slate-500'>
-																Upload book chapter PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															<span className='text-slate-500 font-medium'>
+																Upload book chapter PDF{' '}
+																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -1825,14 +1865,15 @@ export default function Home() {
 																	bookChapterFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1'>
+															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.bookChapterFile && touched.bookChapterFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.bookChapterFile}
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+														{errors.bookChapterFile}
 													</p>
 												)}
 											</div>
@@ -1840,23 +1881,24 @@ export default function Home() {
 									</div>
 
 									{/* Question 11: Patents / Design Registrations / Copyrights */}
-									<div className='section-container space-y-3'>
-										<div className='flex items-center justify-between flex-wrap gap-2'>
+									<div className='section-container space-y-4'>
+										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 														11. Patents / Design Registrations / Copyrights, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
-														Note:- Optional for first year cadets.
+													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
+														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-0.5'>
-													Mention IPR details & upload certificate / filing document in PDF (compulsory if selected).
+												<span className='text-xs text-slate-500 block mt-1'>
+													Mention IPR details & upload certificate / filing document in PDF (if
+													selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
 												<button
 													type='button'
 													onClick={() => {
@@ -1890,10 +1932,10 @@ export default function Home() {
 										</div>
 
 										{formData.hasPatents && (
-											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
-													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-														Patent / IPR Details <span className='text-red-600'>* (Compulsory)</span>
+													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+														Patent / IPR Details <span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
 														name='patentDetails'
@@ -1904,15 +1946,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.patentDetails && touched.patentDetails ? 'input-error' : ''}`}
 													/>
 													{errors.patentDetails && touched.patentDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
-															<AlertCircle className='w-3.5 h-3.5' /> {errors.patentDetails}
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.patentDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
-														<Upload className='w-3.5 h-3.5' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4' />
 														<span>{formData.patentFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -1930,12 +1973,14 @@ export default function Home() {
 													</label>
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.patentFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4' /> {formData.patentFileName}
+															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
+																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+																{formData.patentFileName}
 															</span>
 														) : (
-															<span className='text-slate-500'>
-																Upload patent/filing PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															<span className='text-slate-500 font-medium'>
+																Upload patent/filing PDF{' '}
+																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -1949,14 +1994,14 @@ export default function Home() {
 																	patentFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1'>
+															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.patentFile && touched.patentFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.patentFile}
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.patentFile}
 													</p>
 												)}
 											</div>
@@ -1964,23 +2009,23 @@ export default function Home() {
 									</div>
 
 									{/* Question 12: Participation in Competitions / Hackathons */}
-									<div className='section-container space-y-3'>
-										<div className='flex items-center justify-between flex-wrap gap-2'>
+									<div className='section-container space-y-4'>
+										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 														12. Competitions / Hackathons / Technothons, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
-														Note:- Optional for first year cadets.
+													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
+														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-0.5'>
-													Mention event & achievement, and upload certificate in PDF (compulsory if selected).
+												<span className='text-xs text-slate-500 block mt-1'>
+													Mention event & achievement, and upload certificate in PDF (if selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
 												<button
 													type='button'
 													onClick={() => {
@@ -1991,7 +2036,11 @@ export default function Home() {
 															competitionFileName: '',
 															competitionFileDataUrl: '',
 														}));
-														setErrors((prev) => ({ ...prev, competitionDetails: '', competitionFile: '' }));
+														setErrors((prev) => ({
+															...prev,
+															competitionDetails: '',
+															competitionFile: '',
+														}));
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasCompetitions
@@ -2016,10 +2065,11 @@ export default function Home() {
 										</div>
 
 										{formData.hasCompetitions && (
-											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
-													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-														Event & Achievement Details <span className='text-red-600'>* (Compulsory)</span>
+													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+														Event & Achievement Details{' '}
+														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
 														name='competitionDetails'
@@ -2030,16 +2080,19 @@ export default function Home() {
 														className={`form-input resize-none ${errors.competitionDetails && touched.competitionDetails ? 'input-error' : ''}`}
 													/>
 													{errors.competitionDetails && touched.competitionDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
-															<AlertCircle className='w-3.5 h-3.5' /> {errors.competitionDetails}
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.competitionDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
-														<Upload className='w-3.5 h-3.5' />
-														<span>{formData.competitionFileName ? 'Change PDF' : 'Upload PDF'}</span>
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4' />
+														<span>
+															{formData.competitionFileName ? 'Change PDF' : 'Upload PDF'}
+														</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
@@ -2056,12 +2109,14 @@ export default function Home() {
 													</label>
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.competitionFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4' /> {formData.competitionFileName}
+															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
+																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+																{formData.competitionFileName}
 															</span>
 														) : (
-															<span className='text-slate-500'>
-																Upload certificate PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+															<span className='text-slate-500 font-medium'>
+																Upload certificate PDF{' '}
+																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -2075,14 +2130,15 @@ export default function Home() {
 																	competitionFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1'>
+															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.competitionFile && touched.competitionFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.competitionFile}
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+														{errors.competitionFile}
 													</p>
 												)}
 											</div>
@@ -2110,7 +2166,7 @@ export default function Home() {
 												</p>
 											</div>
 										</div>
-										<span className='section-badge'>Section 3 of 6</span>
+										<span className='section-badge'>Section 3 of 5</span>
 									</div>
 
 									{/* Question 13: Technical / Co-Curricular Activities */}
@@ -2122,11 +2178,12 @@ export default function Home() {
 														13. Technical / Co-Curricular Activities, if any
 													</label>
 													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
-														Note:- Optional for first year cadets.
+														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
 												<span className='text-xs text-slate-500 block mt-0.5'>
-													Mention the activity, event, and your role, and upload certificate in PDF (compulsory if selected).
+													Mention the activity, event, and your role, and upload certificate in PDF
+													(if selected).
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
@@ -2140,7 +2197,11 @@ export default function Home() {
 															activityFileName: '',
 															activityFileDataUrl: '',
 														}));
-														setErrors((prev) => ({ ...prev, activityDetails: '', activityFile: '' }));
+														setErrors((prev) => ({
+															...prev,
+															activityDetails: '',
+															activityFile: '',
+														}));
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasActivities
@@ -2166,7 +2227,8 @@ export default function Home() {
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
 												<div>
 													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-														Activity & Contribution Details <span className='text-red-600'>* (Compulsory)</span>
+														Activity & Contribution Details{' '}
+														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
 														name='activityDetails'
@@ -2208,7 +2270,8 @@ export default function Home() {
 															</span>
 														) : (
 															<span className='text-slate-500'>
-																Upload certificate PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+																Upload certificate PDF{' '}
+																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -2245,11 +2308,11 @@ export default function Home() {
 														14. Major Achievements / Awards, if any
 													</label>
 													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
-														Note:- Optional for first year cadets.
+														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
 												<span className='text-xs text-slate-500 block mt-0.5'>
-													Mention the achievement & upload certificate / proof in PDF (compulsory if selected).
+													Mention the achievement & upload certificate / proof in PDF (if selected).
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
@@ -2263,7 +2326,11 @@ export default function Home() {
 															achievementFileName: '',
 															achievementFileDataUrl: '',
 														}));
-														setErrors((prev) => ({ ...prev, achievementDetails: '', achievementFile: '' }));
+														setErrors((prev) => ({
+															...prev,
+															achievementDetails: '',
+															achievementFile: '',
+														}));
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasAchievements
@@ -2291,7 +2358,8 @@ export default function Home() {
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
 												<div>
 													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-														Achievement & Award Details <span className='text-red-600'>* (Compulsory)</span>
+														Achievement & Award Details{' '}
+														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
 														name='achievementDetails'
@@ -2311,7 +2379,9 @@ export default function Home() {
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
 														<Upload className='w-3.5 h-3.5' />
-														<span>{formData.achievementFileName ? 'Change PDF' : 'Upload PDF'}</span>
+														<span>
+															{formData.achievementFileName ? 'Change PDF' : 'Upload PDF'}
+														</span>
 														<input
 															type='file'
 															accept='.pdf,application/pdf'
@@ -2333,7 +2403,8 @@ export default function Home() {
 															</span>
 														) : (
 															<span className='text-slate-500'>
-																Upload award proof PDF <span className='text-red-600 font-bold'>* (Compulsory)</span>
+																Upload award proof PDF{' '}
+																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -2370,11 +2441,12 @@ export default function Home() {
 														15. Leadership / Coordinator Positions Held, if any
 													</label>
 													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
-														Note:- Optional for first year cadets.
+														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
 												<span className='text-xs text-slate-500 block mt-0.5'>
-													Mention position, organisation/club/event, duration, and responsibilities held.
+													Mention position, organisation/club/event, duration, and responsibilities
+													held.
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
@@ -2414,7 +2486,8 @@ export default function Home() {
 											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
 												<div>
 													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-														Leadership Role Details <span className='text-red-600'>* (Compulsory)</span>
+														Leadership Role Details{' '}
+														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
 														name='leadershipDetails'
@@ -2455,7 +2528,7 @@ export default function Home() {
 												</p>
 											</div>
 										</div>
-										<span className='section-badge'>Section 4 of 6</span>
+										<span className='section-badge'>Section 4 of 5</span>
 									</div>
 
 									{/* Question 16: Maritime / University Ecosystem Problem */}
@@ -2463,7 +2536,8 @@ export default function Home() {
 										<label
 											htmlFor='problemMaritime'
 											className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-											16. Problem in the Maritime / University Ecosystem you would like to solve
+											16. Problem in the Indian Maritime University Ecosystem you would like to
+											solve
 										</label>
 										<p className='text-xs text-slate-600 leading-relaxed'>
 											Briefly describe the problem and why you think it needs to be addressed.
@@ -2573,147 +2647,164 @@ export default function Home() {
 								</section>
 
 								{/* ======================================================== */}
-								{/* SECTION 5: SUPPORTING INFORMATION (Q19) */}
+								{/* SECTION 5: SUPPORTING DOCUMENTS & DECLARATION (Q19 - Q20) */}
 								{/* ======================================================== */}
 								<section
 									id='section-5'
-									className={`space-y-6 ${currentStep === 5 ? 'block' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
-										<div className='flex items-center gap-2.5'>
-											<div className='w-8 h-8 rounded-lg bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm'>
+									className={`space-y-7 ${currentStep === 5 ? 'block' : 'hidden'}`}>
+									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
+										<div className='flex items-center gap-3'>
+											<div className='w-9 h-9 rounded-xl bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
 												5
 											</div>
 											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide'>
-													Supporting Information
+												<h2 className='text-lg sm:text-xl font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
+													Supporting Documents & Official Declaration
 												</h2>
-												<p className='text-xs text-slate-500 font-medium'>
-													Question 19 • Detailed Resume / CV & Proof Documents
+												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
+													Questions 19 & 20 • Resume / CV, Master PDF & Official Student Declaration
 												</p>
 											</div>
 										</div>
-										<span className='section-badge'>Section 5 of 6</span>
+										<span className='section-badge'>Section 5 of 5</span>
 									</div>
 
-									{/* Question 19: Upload Detailed Resume / CV */}
+									{/* Question 19: Upload Detailed Resume / CV (Optional / Recommended with 2 Tabs) */}
 									<div id='resume' className='section-container space-y-4'>
-										<div>
-											<label
-												htmlFor='resumeInput'
-												className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-												19. Upload Detailed Resume / CV (PDF){' '}
-												<span className='text-red-600'>*</span>
-											</label>
-											<p className='text-xs text-slate-600 mt-1 leading-relaxed'>
-												Upload your latest CV/resume in PDF format. All uploaded proofs and
-												marksheet certificates across sections are automatically merged into a
-												single combined master PDF document.
-											</p>
-										</div>
-
-										<div className='p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 text-xs sm:text-xs leading-relaxed space-y-1'>
-											<span className='font-bold text-sky-900 block'>
-												📌 Automatic Single Master PDF Storage:
-											</span>
-											<p>
-												• Includes: Latest Resume, Semester Marksheets, Certificate Proofs, Awards &
-												Positions.
-											</p>
-											<p>
-												• Accepted Format: <strong>.pdf</strong> (Maximum size: 25MB).
-											</p>
-										</div>
-
-										<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4'>
-											<label className='inline-flex items-center justify-center gap-2 px-5 py-3 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs transition-all flex-shrink-0'>
-												<Upload className='w-4 h-4 text-sky-700' />
-												<span>
-													{formData.resumeName ? 'Change Resume PDF' : 'Upload Resume PDF'}
-												</span>
-												<input
-													type='file'
-													id='resumeInput'
-													name='resume'
-													accept='.pdf,application/pdf'
-													onChange={(e) =>
-														handlePdfChange(e, 'resumeName', 'resumeDataUrl', 'resume')
-													}
-													className='sr-only'
-												/>
-											</label>
-
-											<div className='flex-1 min-w-0'>
-												{formData.resumeName ? (
-													<div className='flex items-center justify-between gap-2 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200'>
-														<span className='text-xs sm:text-sm font-bold text-emerald-800 truncate flex items-center gap-1.5'>
-															<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-															{formData.resumeName}
-														</span>
-														<button
-															type='button'
-															onClick={() =>
-																setFormData((prev) => ({
-																	...prev,
-																	resumeName: '',
-																	resumeDataUrl: '',
-																}))
-															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 px-2 py-1 rounded bg-white border border-red-200 flex-shrink-0'>
-															Remove
-														</button>
-													</div>
-												) : (
-													<span className='text-xs sm:text-sm text-slate-500 font-medium'>
-														No file chosen yet (.pdf up to 25MB)
+										<div className='flex items-center justify-between flex-wrap gap-3'>
+											<div>
+												<div className='flex items-center gap-2 flex-wrap'>
+													<label
+														htmlFor='resumeInput'
+														className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+														19. Upload Detailed Resume / CV (PDF)
+													</label>
+													<span className='text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded-full'>
+														Recommended
 													</span>
+												</div>
+												<span className='text-xs text-slate-500 block mt-1'>
+													Upload your latest CV/resume in PDF format (strongly recommended for
+													council evaluation, or select N/A if not available).
+												</span>
+											</div>
+
+											{/* N/A / Upload Toggle Tabs */}
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+												<button
+													type='button'
+													onClick={() => {
+														setFormData((prev) => ({
+															...prev,
+															hasResume: false,
+															resumeName: '',
+															resumeDataUrl: '',
+														}));
+														setErrors((prev) => ({ ...prev, resume: '' }));
+													}}
+													className={`na-toggle-btn ${
+														!formData.hasResume
+															? 'bg-[#0e2544] text-white shadow-xs'
+															: 'text-slate-600 hover:text-slate-900'
+													}`}>
+													Not Applicable (N/A)
+												</button>
+												<button
+													type='button'
+													onClick={() => setFormData((prev) => ({ ...prev, hasResume: true }))}
+													className={`na-toggle-btn ${
+														formData.hasResume
+															? 'bg-emerald-700 text-white shadow-xs'
+															: 'text-slate-600 hover:text-slate-900'
+													}`}>
+													+ Upload Resume (Recommended)
+												</button>
+											</div>
+										</div>
+
+										{formData.hasResume && (
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
+												<div className='p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-sky-50 to-slate-50 border border-sky-200/90 text-sky-950 text-xs sm:text-[13px] leading-relaxed space-y-1.5 shadow-2xs'>
+													<span className='font-bold text-sky-950 block'>
+														📌 Automatic Single Master PDF Storage:
+													</span>
+													<p className='text-sky-900'>
+														• Includes: Latest Resume, Semester Marksheets, Certificate Proofs,
+														Awards & Positions.
+													</p>
+													<p className='text-sky-900'>
+														• Accepted Format: <strong>.pdf</strong> (Maximum size: 25MB).
+													</p>
+												</div>
+
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
+													<label className='inline-flex items-center justify-center gap-2 px-5 py-3 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4 text-sky-700' />
+														<span>
+															{formData.resumeName ? 'Change Resume PDF' : 'Upload Resume PDF'}
+														</span>
+														<input
+															type='file'
+															id='resumeInput'
+															name='resume'
+															accept='.pdf,application/pdf'
+															onChange={(e) =>
+																handlePdfChange(e, 'resumeName', 'resumeDataUrl', 'resume')
+															}
+															className='sr-only'
+														/>
+													</label>
+
+													<div className='flex-1 min-w-0'>
+														{formData.resumeName ? (
+															<div className='flex items-center justify-between gap-2 bg-emerald-50 p-3 rounded-xl border border-emerald-200'>
+																<span className='text-xs sm:text-sm font-bold text-emerald-800 truncate flex items-center gap-1.5'>
+																	<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />
+																	{formData.resumeName}
+																</span>
+																<button
+																	type='button'
+																	onClick={() =>
+																		setFormData((prev) => ({
+																			...prev,
+																			resumeName: '',
+																			resumeDataUrl: '',
+																		}))
+																	}
+																	className='text-xs font-bold text-red-600 hover:text-red-800 px-2.5 py-1 rounded-lg bg-white border border-red-200 flex-shrink-0 hover:bg-red-50 transition-colors'>
+																	Remove
+																</button>
+															</div>
+														) : (
+															<span className='text-xs sm:text-sm text-slate-500 font-medium'>
+																No file chosen yet (.pdf up to 25MB)
+															</span>
+														)}
+													</div>
+												</div>
+
+												{errors.resume && (
+													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.resume}
+													</p>
 												)}
 											</div>
-										</div>
-
-										{errors.resume && (
-											<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1'>
-												<AlertCircle className='w-3.5 h-3.5' /> {errors.resume}
-											</p>
 										)}
-									</div>
-								</section>
-
-								{/* ======================================================== */}
-								{/* SECTION 6: DECLARATION & CONSENT (Q20) */}
-								{/* ======================================================== */}
-								<section
-									id='section-6'
-									className={`space-y-6 ${currentStep === 6 ? 'block' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
-										<div className='flex items-center gap-2.5'>
-											<div className='w-8 h-8 rounded-lg bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm'>
-												6
-											</div>
-											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide'>
-													Official Declaration
-												</h2>
-												<p className='text-xs text-slate-500 font-medium'>
-													Question 20 • Student Declaration & Consent for Participation
-												</p>
-											</div>
-										</div>
-										<span className='section-badge'>Section 6 of 6</span>
 									</div>
 
 									{/* Question 20: Student Declaration */}
-									<div id='declarationAccepted' className='section-container space-y-4'>
-										<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
+									<div id='declarationAccepted' className='section-container space-y-5'>
+										<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
 											20. Student Declaration / Consent for Participation in IIC Activities{' '}
-											<span className='text-red-600'>*</span>
+											<span className='text-red-600 font-bold'>*</span>
 										</label>
 
 										{/* Declaration Statement Box */}
-										<div className='p-4 sm:p-5 rounded-xl bg-slate-50 border-l-4 border-[#0e2544] text-slate-800 text-xs sm:text-sm leading-relaxed shadow-xs'>
-											<strong className='text-[#0e2544] font-bold block mb-2 uppercase tracking-wide text-xs'>
+										<div className='p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100/70 border-l-4 border-[#0e2544] border-y border-r border-slate-200/90 text-slate-800 text-xs sm:text-sm leading-relaxed shadow-xs'>
+											<strong className='text-[#0e2544] font-bold block mb-2 uppercase tracking-wide text-xs font-heading'>
 												Declaration Statement:
 											</strong>
-											<p className='italic text-slate-700 leading-relaxed'>
+											<p className='italic text-slate-700 leading-relaxed font-medium'>
 												“I hereby declare that the information provided by me is true and correct to
 												the best of my knowledge. I understand that submission of this form does not
 												guarantee selection to the IIC Student Council. If selected, I agree to
@@ -2724,7 +2815,7 @@ export default function Home() {
 										</div>
 
 										{/* Declaration Consent Checkbox */}
-										<label className='flex items-start gap-3 p-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50/80 cursor-pointer transition-colors'>
+										<label className='flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl border-2 border-slate-200 bg-white hover:border-[#0e2544]/60 cursor-pointer transition-all shadow-2xs'>
 											<input
 												type='checkbox'
 												name='declarationAccepted'
@@ -2746,22 +2837,24 @@ export default function Home() {
 										</label>
 
 										{errors.declarationAccepted && touched.declarationAccepted && (
-											<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1'>
-												<AlertCircle className='w-3.5 h-3.5' /> {errors.declarationAccepted}
+											<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+												<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+												{errors.declarationAccepted}
 											</p>
 										)}
 
 										{/* Digital Signature Confirmation Preview */}
 										{formData.cadetName && (
-											<div className='pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-200 flex-wrap gap-2'>
+											<div className='pt-3 flex items-center justify-between text-xs text-slate-500 border-t border-slate-200 flex-wrap gap-2'>
 												<span>
-													<strong>Digital Signature:</strong>{' '}
-													<span className='font-mono font-bold text-[#0e2544] uppercase'>
+													<strong className='text-slate-700'>Digital Signature:</strong>{' '}
+													<span className='font-mono font-bold text-[#0e2544] uppercase bg-slate-100 px-2 py-0.5 rounded border border-slate-200'>
 														{formData.cadetName}
 													</span>
 												</span>
 												<span>
-													<strong>Timestamp:</strong> {new Date().toLocaleDateString('en-GB')}
+													<strong className='text-slate-700'>Timestamp:</strong>{' '}
+													{new Date().toLocaleDateString('en-GB')}
 												</span>
 											</div>
 										)}
@@ -2771,40 +2864,40 @@ export default function Home() {
 								{/* ======================================================== */}
 								{/* STEP NAVIGATION & SUBMIT CONTROLS */}
 								{/* ======================================================== */}
-								<div className='pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3'>
-									<div className='flex items-center gap-2 w-full sm:w-auto'>
+								<div className='pt-7 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3.5'>
+									<div className='flex items-center gap-2.5 w-full sm:w-auto'>
 										<button
 											type='button'
 											onClick={handleReset}
-											className='btn-secondary w-full sm:w-auto flex items-center justify-center gap-1.5'>
-											<RotateCcw className='w-3.5 h-3.5' /> Clear Form
+											className='btn-secondary w-full sm:w-auto flex items-center justify-center gap-2'>
+											<RotateCcw className='w-4 h-4' /> Clear Form
 										</button>
 										{currentStep > 1 && (
 											<button
 												type='button'
 												onClick={prevStep}
-												className='btn-secondary w-full sm:w-auto flex items-center justify-center gap-1.5'>
+												className='btn-secondary w-full sm:w-auto flex items-center justify-center gap-2'>
 												<ChevronLeft className='w-4 h-4' /> Previous
 											</button>
 										)}
 									</div>
 
 									<div className='flex items-center gap-3 w-full sm:w-auto'>
-										{/* On Steps 1 to 5: Only show "Next" Button */}
-										{currentStep < 6 ? (
+										{/* On Steps 1 to 4: Only show "Next" Button */}
+										{currentStep < 5 ? (
 											<button
 												type='button'
 												onClick={nextStep}
-												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5'>
+												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2'>
 												<span>Next: {SECTIONS[currentStep]?.title}</span>
 												<ChevronRight className='w-4 h-4' />
 											</button>
 										) : (
-											/* On Step 6: Show "Submit Enrollment Form" Button */
+											/* On Step 5: Show "Submit Enrollment Form" Button */
 											<button
 												type='submit'
 												disabled={submitting}
-												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-800 hover:bg-emerald-900 border-emerald-900 shadow-md'>
+												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 bg-emerald-800 hover:bg-emerald-900 border-emerald-900 shadow-md'>
 												<ShieldCheck className='w-4 h-4' />
 												<span>
 													{submitting ? 'Submitting Application...' : 'Submit Enrollment Form'}

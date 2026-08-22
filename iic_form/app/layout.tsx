@@ -33,6 +33,15 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang='en' className={`${montserrat.variable} ${inter.variable} h-full antialiased`}>
+			<head>
+				<link
+					rel='preload'
+					as='image'
+					href='/iic-banner-2026.webp'
+					type='image/webp'
+					fetchPriority='high'
+				/>
+			</head>
 			<body className='min-h-full bg-[#f3f6fa] text-[#0e2544] flex flex-col font-sans selection:bg-[#0e2544] selection:text-white'>
 				{children}
 			</body>
