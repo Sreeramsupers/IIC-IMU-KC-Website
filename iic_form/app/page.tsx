@@ -1,16 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useRef, FormEvent, ChangeEvent, FocusEvent } from 'react';
+import React, { useState, useEffect, FormEvent, ChangeEvent, FocusEvent } from 'react';
 import Image from 'next/image';
 import confetti from 'canvas-confetti';
 import { PDFDocument } from 'pdf-lib';
 import {
 	User,
 	GraduationCap,
-	BookOpen,
 	Award,
 	Lightbulb,
-	FileText,
 	CheckCircle2,
 	AlertCircle,
 	Upload,
@@ -24,10 +22,14 @@ import {
 	Plus,
 	Check,
 	RotateCcw,
-	Printer,
-	Lock,
-	Layers,
-	FileStack,
+	Copy,
+	CheckCheck,
+	Mail,
+	Phone,
+	Hash,
+	Building2,
+	Compass,
+	Calendar,
 } from 'lucide-react';
 
 export interface FormData {
@@ -178,7 +180,6 @@ const SEMESTERS = [
 const DEPARTMENTS = [
 	'B.Tech Marine Engineering',
 	'MBA (International Transportation & Logistics Management)',
-	'Other Academic Program',
 ];
 
 const SUGGESTED_INTERESTS = [
@@ -269,12 +270,12 @@ export default function Home() {
 	const [errors, setErrors] = useState<{ [key: string]: string }>({});
 	const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
 	const [currentStep, setCurrentStep] = useState<number>(1);
-	const [visitedSteps, setVisitedSteps] = useState<number[]>([1]);
+	const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 	const [submitted, setSubmitted] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [submittedRefId, setSubmittedRefId] = useState('');
 	const [draftSaved, setDraftSaved] = useState(false);
-	const [mergedPdfCount, setMergedPdfCount] = useState<number>(0);
+	const [copiedRefId, setCopiedRefId] = useState(false);
 
 	const isFirstYear = formData.yearOfStudy === '1st Year';
 
@@ -284,23 +285,26 @@ export default function Home() {
 			const savedDraft = localStorage.getItem('iic_form_draft_v2');
 			if (savedDraft) {
 				const parsed = JSON.parse(savedDraft);
-				setFormData((prev) => ({
-					...prev,
-					...parsed,
-					photoDataUrl: '',
-					resumeDataUrl: '',
-					marksheetDataUrl: '',
-					journalFileDataUrl: '',
-					bookChapterFileDataUrl: '',
-					patentFileDataUrl: '',
-					competitionFileDataUrl: '',
-					activityFileDataUrl: '',
-					achievementFileDataUrl: '',
-					leadershipFileDataUrl: '',
-				}));
+				const timer = setTimeout(() => {
+					setFormData((prev) => ({
+						...prev,
+						...parsed,
+						photoDataUrl: '',
+						resumeDataUrl: '',
+						marksheetDataUrl: '',
+						journalFileDataUrl: '',
+						bookChapterFileDataUrl: '',
+						patentFileDataUrl: '',
+						competitionFileDataUrl: '',
+						activityFileDataUrl: '',
+						achievementFileDataUrl: '',
+						leadershipFileDataUrl: '',
+					}));
+				}, 0);
+				return () => clearTimeout(timer);
 			}
-		} catch (e) {
-			console.warn('Could not load draft from localStorage:', e);
+		} catch (err) {
+			console.warn('Could not load draft from localStorage:', err);
 		}
 	}, []);
 
@@ -308,30 +312,31 @@ export default function Home() {
 	useEffect(() => {
 		if (submitted) return;
 		try {
-			const {
-				photoDataUrl,
-				resumeDataUrl,
-				marksheetDataUrl,
-				journalFileDataUrl,
-				bookChapterFileDataUrl,
-				patentFileDataUrl,
-				competitionFileDataUrl,
-				activityFileDataUrl,
-				achievementFileDataUrl,
-				leadershipFileDataUrl,
-				...safeData
-			} = formData;
+			const safeData: Partial<FormData> = { ...formData };
+			delete safeData.photoDataUrl;
+			delete safeData.resumeDataUrl;
+			delete safeData.marksheetDataUrl;
+			delete safeData.journalFileDataUrl;
+			delete safeData.bookChapterFileDataUrl;
+			delete safeData.patentFileDataUrl;
+			delete safeData.competitionFileDataUrl;
+			delete safeData.activityFileDataUrl;
+			delete safeData.achievementFileDataUrl;
+			delete safeData.leadershipFileDataUrl;
 			localStorage.setItem('iic_form_draft_v2', JSON.stringify(safeData));
-			setDraftSaved(true);
-			const timer = setTimeout(() => setDraftSaved(false), 2000);
+			const timer = setTimeout(() => {
+				setDraftSaved(true);
+				const hideTimer = setTimeout(() => setDraftSaved(false), 2000);
+				return () => clearTimeout(hideTimer);
+			}, 0);
 			return () => clearTimeout(timer);
-		} catch (e) {
+		} catch {
 			// localStorage full or disabled
 		}
 	}, [formData, submitted]);
 
 	// Field-Level Validation Helper
-	const validateField = (name: string, value: any): string => {
+	const validateField = (name: string, value: unknown): string => {
 		switch (name) {
 			case 'cadetName': {
 				const trimmed = typeof value === 'string' ? value.trim() : '';
@@ -345,7 +350,7 @@ export default function Home() {
 				const trimmed = typeof value === 'string' ? value.trim() : '';
 				if (!trimmed) {
 					return isFirstYear
-						? 'Roll number / Serial number is required for 1st Year Cadets.'
+						? 'Reg No / Serial number is required for 1st Year Cadets.'
 						: 'Permanent University Registration Number is required.';
 				}
 				if (trimmed.length < 2) return 'Please enter a valid registration/serial number.';
@@ -380,7 +385,24 @@ export default function Home() {
 			}
 			case 'resume': {
 				if (formData.hasResume && !formData.resumeName)
-					return 'Please upload your Resume / CV (PDF), or select Not Applicable (N/A).';
+					return 'Please upload your Resume / CV (PDF), or select NIL.';
+				return '';
+			}
+			case 'problemMaritime': {
+				const trimmed = typeof value === 'string' ? value.trim() : '';
+				if (!trimmed)
+					return 'Please describe a problem in the IMU ecosystem you would like to solve.';
+				return '';
+			}
+			case 'problemSociety': {
+				const trimmed = typeof value === 'string' ? value.trim() : '';
+				if (!trimmed) return 'Please describe a problem in society you would like to solve.';
+				return '';
+			}
+			case 'areasOfInterest': {
+				const count = Array.isArray(value) ? value.length : formData.areasOfInterest.length;
+				if (count === 0)
+					return 'Please select or add at least 1 area of innovation/technology interest.';
 				return '';
 			}
 			case 'declarationAccepted': {
@@ -419,7 +441,7 @@ export default function Home() {
 		setErrors((prev) => ({ ...prev, [name]: error }));
 	};
 
-	// Passport photo change with automatic image resizing
+	// Passport photo change with automatic image resizing (max 10MB)
 	const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
 		if (file) {
@@ -430,8 +452,8 @@ export default function Home() {
 				}));
 				return;
 			}
-			if (file.size > 15 * 1024 * 1024) {
-				setErrors((prev) => ({ ...prev, photo: 'Image size must be under 15MB.' }));
+			if (file.size > 10 * 1024 * 1024) {
+				setErrors((prev) => ({ ...prev, photo: 'Image size must be under 10MB.' }));
 				return;
 			}
 
@@ -476,7 +498,7 @@ export default function Home() {
 		}
 	};
 
-	// Generic PDF upload handler
+	// Generic PDF upload handler (max 15MB)
 	const handlePdfChange = (
 		e: ChangeEvent<HTMLInputElement>,
 		fieldNameKey: keyof FormData,
@@ -491,9 +513,9 @@ export default function Home() {
 				}
 				return;
 			}
-			if (file.size > 25 * 1024 * 1024) {
+			if (file.size > 15 * 1024 * 1024) {
 				if (errorKey) {
-					setErrors((prev) => ({ ...prev, [errorKey]: 'PDF file size must be under 25MB.' }));
+					setErrors((prev) => ({ ...prev, [errorKey]: 'PDF file size must be under 15MB.' }));
 				}
 				return;
 			}
@@ -520,6 +542,9 @@ export default function Home() {
 			const updated = exists
 				? prev.areasOfInterest.filter((i) => i !== item)
 				: [...prev.areasOfInterest, item];
+			if (updated.length > 0) {
+				setErrors((e) => ({ ...e, areasOfInterest: '' }));
+			}
 			return { ...prev, areasOfInterest: updated };
 		});
 	};
@@ -534,7 +559,17 @@ export default function Home() {
 					areasOfInterest: [...prev.areasOfInterest, trimmed],
 					customInterest: '',
 				}));
+				setErrors((e) => ({ ...e, areasOfInterest: '' }));
 			}
+		}
+	};
+
+	// Copy Reference ID
+	const handleCopyRefId = () => {
+		if (submittedRefId && typeof navigator !== 'undefined' && navigator.clipboard) {
+			navigator.clipboard.writeText(submittedRefId);
+			setCopiedRefId(true);
+			setTimeout(() => setCopiedRefId(false), 2500);
 		}
 	};
 
@@ -587,18 +622,16 @@ export default function Home() {
 			return true;
 		}
 		if (stepNumber === 4) {
-			return true;
+			const maritimeErr = validateField('problemMaritime', formData.problemMaritime);
+			const societyErr = validateField('problemSociety', formData.problemSociety);
+			const areasErr = formData.areasOfInterest.length === 0;
+			return !maritimeErr && !societyErr && !areasErr;
 		}
 		if (stepNumber === 5) {
 			if (formData.hasResume && !formData.resumeName) return false;
 			const decErr = validateField('declarationAccepted', formData.declarationAccepted);
 			return !decErr;
 		}
-		return true;
-	};
-
-	// Check if step is accessible (all steps are freely accessible)
-	const canAccessStep = (_targetStep: number): boolean => {
 		return true;
 	};
 
@@ -685,9 +718,22 @@ export default function Home() {
 			}
 		}
 
+		if (stepNumber === 4) {
+			const maritimeErr = validateField('problemMaritime', formData.problemMaritime);
+			if (maritimeErr) newErrors.problemMaritime = maritimeErr;
+
+			const societyErr = validateField('problemSociety', formData.problemSociety);
+			if (societyErr) newErrors.problemSociety = societyErr;
+
+			if (formData.areasOfInterest.length === 0) {
+				newErrors.areasOfInterest =
+					'Please select or add at least 1 area of innovation / technology interest.';
+			}
+		}
+
 		if (stepNumber === 5) {
 			if (formData.hasResume && !formData.resumeName) {
-				newErrors.resume = 'Please upload your Resume / CV (PDF), or select Not Applicable (N/A).';
+				newErrors.resume = 'Please upload your Resume / CV (PDF), or select NIL.';
 			}
 
 			const decErr = validateField('declarationAccepted', formData.declarationAccepted);
@@ -709,29 +755,29 @@ export default function Home() {
 	};
 
 	const handleStepClick = (targetStep: number) => {
-		setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
 		setCurrentStep(targetStep);
 		if (typeof window !== 'undefined') {
-			window.scrollTo({ top: 300, behavior: 'smooth' });
+			window.scrollTo({ top: 320, behavior: 'smooth' });
 		}
 	};
 
 	const nextStep = () => {
-		if (currentStep < 5) {
-			setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
-			setCurrentStep((prev) => prev + 1);
-			if (typeof window !== 'undefined') {
-				window.scrollTo({ top: 300, behavior: 'smooth' });
+		if (validateStep(currentStep)) {
+			setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
+			if (currentStep < 5) {
+				setCurrentStep((prev) => prev + 1);
+				if (typeof window !== 'undefined') {
+					window.scrollTo({ top: 320, behavior: 'smooth' });
+				}
 			}
 		}
 	};
 
 	const prevStep = () => {
 		if (currentStep > 1) {
-			setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
 			setCurrentStep((prev) => prev - 1);
 			if (typeof window !== 'undefined') {
-				window.scrollTo({ top: 300, behavior: 'smooth' });
+				window.scrollTo({ top: 320, behavior: 'smooth' });
 			}
 		}
 	};
@@ -789,25 +835,23 @@ export default function Home() {
 				`[PDF Merge] Combining ${pdfsToMerge.length} uploaded PDF(s) into single master PDF...`,
 			);
 			const { mergedDataUrl, mergedCount } = await mergeAllPdfs(pdfsToMerge);
-			setMergedPdfCount(mergedCount);
 
 			// Strip redundant individual base64 binaries to optimize network payload size
-			const {
-				marksheetDataUrl,
-				journalFileDataUrl,
-				bookChapterFileDataUrl,
-				patentFileDataUrl,
-				competitionFileDataUrl,
-				activityFileDataUrl,
-				achievementFileDataUrl,
-				leadershipFileDataUrl,
-				...cleanFormData
-			} = formData;
+			const cleanFormData: Partial<FormData> = { ...formData };
+			delete cleanFormData.marksheetDataUrl;
+			delete cleanFormData.journalFileDataUrl;
+			delete cleanFormData.bookChapterFileDataUrl;
+			delete cleanFormData.patentFileDataUrl;
+			delete cleanFormData.competitionFileDataUrl;
+			delete cleanFormData.activityFileDataUrl;
+			delete cleanFormData.achievementFileDataUrl;
+			delete cleanFormData.leadershipFileDataUrl;
 
 			const payload = {
 				...cleanFormData,
 				referenceId: generatedRefId,
 				submittedAt: new Date().toISOString(),
+				templateDocId: '1x69S7y0X7UJYR7x2ZEKCoQzPFCb-2nHctp6XNQG3E7I',
 				// Combined master single PDF containing all uploaded proofs & resume
 				combinedPdfDataUrl: mergedDataUrl || formData.resumeDataUrl,
 				mergedPdfCount: mergedCount,
@@ -815,9 +859,10 @@ export default function Home() {
 				resumeDataUrl: mergedDataUrl || formData.resumeDataUrl,
 			};
 
-			const directGoogleUrl =
+			const rawDirectUrl =
 				process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL ||
-				'https://script.google.com/macros/s/AKfycbxv10O9EXLDYAb1Im8m8hG7g40jtOinRi_-dXTdHIU51ohFkqn-A2K7nQ9AmA2eEsSo/exec';
+				'https://script.google.com/macros/s/AKfycbzVklG1gmnnhi1wq6HVMTNr_1XcMADOURNKSJOHFTSDmZzUCPkSQzFWIHslsOIRU3M6/exec';
+			const directGoogleUrl = rawDirectUrl.trim().replace(/^['"]|['"]$/g, '').replace(/^h+ttps:\/\//i, 'https://');
 
 			try {
 				const res = await fetch('/api/submit', {
@@ -844,17 +889,21 @@ export default function Home() {
 			// Clear draft on successful submission
 			try {
 				localStorage.removeItem('iic_form_draft_v2');
-			} catch (e) {}
+			} catch {
+				// Ignore storage error
+			}
 
 			// Fire celebratory confetti!
 			try {
 				confetti({
-					particleCount: 120,
-					spread: 80,
+					particleCount: 130,
+					spread: 85,
 					origin: { y: 0.6 },
 					colors: ['#0e2544', '#0284c7', '#f59e0b', '#10b981', '#6366f1'],
 				});
-			} catch (e) {}
+			} catch {
+				// Ignore confetti error
+			}
 		} catch (err) {
 			console.error('Submission request failed:', err);
 		} finally {
@@ -868,23 +917,32 @@ export default function Home() {
 		setFormData(INITIAL_STATE);
 		setErrors({});
 		setTouched({});
-		setVisitedSteps([1]);
+		setCompletedSteps([]);
 		setCurrentStep(1);
 		setSubmitted(false);
 		try {
 			localStorage.removeItem('iic_form_draft_v2');
-		} catch (e) {}
+		} catch {
+			// Ignore storage error
+		}
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	};
 
+	// Calculate overall completion progress based on validated steps via Next button
+	const completedCount = completedSteps.length;
+	const progressPercent = Math.round((completedCount / 5) * 100);
+
 	return (
-		<main className='relative w-full min-h-screen py-6 sm:py-10 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start bg-[#f0f4f8]'>
+		<main className='relative w-full min-h-screen py-5 sm:py-9 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start nautical-grid-pattern'>
+			{/* Ambient Radial Lighting Overlay */}
+			<div className='pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(2,132,199,0.12),rgba(255,255,255,0))]' />
+
 			{/* Form Shell / Center Card */}
 			<div className='relative z-10 w-full max-w-4xl mb-16 mt-1 sm:mt-2'>
-				<div className='clean-card overflow-hidden bg-white'>
-					{/* Official Banner Header */}
-					<div className='w-full bg-[#f8fafc] border-b border-slate-200/90 p-2.5 sm:p-3.5 flex justify-center'>
-						<div className='w-full max-w-[1024px] relative'>
+				<div className='clean-card overflow-hidden bg-white/95 backdrop-blur-md'>
+					{/* Official Banner Header with Beveled Frame */}
+					<div className='w-full bg-gradient-to-b from-slate-100/90 to-slate-50 border-b border-slate-200/90 p-2.5 sm:p-4 flex justify-center'>
+						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden shadow-xs border border-slate-200/80 bg-white'>
 							<Image
 								src='/iic-banner-2026.webp'
 								alt='IMU Kolkata Campus - Institution Innovation Council (IIC) 2026-27'
@@ -893,7 +951,7 @@ export default function Home() {
 								unoptimized
 								priority
 								fetchPriority='high'
-								className='w-full h-auto object-contain mx-auto rounded-xl shadow-2xs'
+								className='w-full h-auto object-contain mx-auto'
 								style={{ imageRendering: '-webkit-optimize-contrast' }}
 							/>
 						</div>
@@ -903,96 +961,101 @@ export default function Home() {
 					<div className='px-6 sm:px-9 py-6 sm:py-7 border-b border-slate-100 bg-white'>
 						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3.5'>
 							<div>
-								<div className='flex items-center gap-2 mb-1.5'>
-									<span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs'>
+								<div className='flex items-center gap-2 mb-1.5 flex-wrap'>
+									<span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs'>
 										Academic Year 2026–27
 									</span>
-									<span className='text-xs font-semibold text-slate-500 uppercase tracking-wider'>
-										IMU Kolkata Campus
+									<span className='inline-flex items-center gap-1 text-xs font-bold text-slate-500 uppercase tracking-wider'>
+										<Building2 className='w-3.5 h-3.5 text-slate-400' />
+										Indian Maritime University - Kolkata Campus
 									</span>
 								</div>
-								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-extrabold text-[#0e2544] uppercase tracking-wide leading-tight font-heading'>
+								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-black text-[#0e2544] uppercase tracking-tight leading-tight font-heading'>
 									Institution’s Innovation Council (IIC) – Cadet Enrollment Form
 								</h1>
 							</div>
 							{draftSaved && (
-								<div className='flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200 font-semibold self-start sm:self-auto shadow-2xs animate-pulse'>
-									<Check className='w-3.5 h-3.5' /> Auto-saved
+								<div className='flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-300 font-bold self-start sm:self-auto shadow-2xs animate-fadeIn'>
+									<Check className='w-3.5 h-3.5 text-emerald-600' /> Auto-saved
 								</div>
 							)}
 						</div>
 
-						{/* Instructions to cadets Banner */}
-						<div className='mt-5 p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-50 via-sky-50/40 to-slate-50 border border-slate-200/90 shadow-xs'>
-							<div className='flex items-center gap-2.5 pb-3.5 mb-3.5 border-b border-slate-200/70'>
-								<div className='w-7 h-7 rounded-lg bg-[#0e2544] text-white flex items-center justify-center flex-shrink-0 shadow-xs'>
-									<Info className='w-4 h-4 text-sky-200' />
+						{/* Instructions to cadets Banner (Visible only before submission) */}
+						{!submitted && (
+							<div className='mt-5 p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-50 via-sky-50/35 to-slate-50 border border-slate-200/90 shadow-2xs'>
+								<div className='flex items-center gap-2.5 pb-3.5 mb-3.5 border-b border-slate-200/70'>
+									<div className='w-7 h-7 rounded-lg bg-[#0e2544] text-white flex items-center justify-center flex-shrink-0 shadow-xs'>
+										<Info className='w-4 h-4 text-sky-300' />
+									</div>
+									<h2 className='font-bold text-[#0e2544] uppercase tracking-wider text-xs sm:text-sm font-heading'>
+										Important Notice / Instructions:
+									</h2>
 								</div>
-								<h2 className='font-bold text-[#0e2544] uppercase tracking-wider text-xs sm:text-sm font-heading'>
-									Important Notice / Instructions:
-								</h2>
+								<ol className='space-y-3 text-slate-700 text-xs sm:text-[13.5px] leading-relaxed'>
+									<li className='flex items-start gap-3'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+											1
+										</span>
+										<span className='flex-1 font-medium'>
+											Fields marked with an asterisk (
+											<span className='text-rose-600 font-extrabold'>*</span>) are mandatory and must
+											be completed.
+										</span>
+									</li>
+									<li className='flex items-start gap-3'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+											2
+										</span>
+										<span className='flex-1 font-medium'>
+											Cadets are advised to ensure that all information provided is accurate,
+											complete, and supported by valid documents before submission.
+										</span>
+									</li>
+									<li className='flex items-start gap-3'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+											3
+										</span>
+										<span className='flex-1 font-medium'>
+											The Enrollment Form and all supporting documents/proofs submitted will be
+											compiled into a single PDF and sent to the registered email ID.
+										</span>
+									</li>
+									<li className='flex items-start gap-3'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+											4
+										</span>
+										<span className='flex-1 font-medium'>
+											Cadets are required to verify all their details and entries made in the PDF
+											received through their registered email ID.
+										</span>
+									</li>
+									<li className='flex items-start gap-3'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+											5
+										</span>
+										<span className='flex-1 font-medium'>
+											After verification, sign in the space provided and self-attest the
+											PDF/documents, and submit the duly verified documents in person to the concerned
+											Faculty In-charge.
+										</span>
+									</li>
+								</ol>
 							</div>
-							<ol className='space-y-3 text-slate-700 text-xs sm:text-[13.5px] leading-relaxed'>
-								<li className='flex items-start gap-3'>
-									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
-										1
-									</span>
-									<span className='flex-1 font-medium'>
-										Fields marked with an asterisk (*) are mandatory and must be completed.
-									</span>
-								</li>
-								<li className='flex items-start gap-3'>
-									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
-										2
-									</span>
-									<span className='flex-1 font-medium'>
-										Cadets are advised to ensure that all information provided is accurate,
-										complete, and supported by valid documents before submission.
-									</span>
-								</li>
-								<li className='flex items-start gap-3'>
-									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
-										3
-									</span>
-									<span className='flex-1 font-medium'>
-										The Enrollment Form and all supporting documents/proofs submitted will be
-										compiled into a single PDF and sent to the registered email ID.
-									</span>
-								</li>
-								<li className='flex items-start gap-3'>
-									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
-										4
-									</span>
-									<span className='flex-1 font-medium'>
-										Cadets are required to verify all their details and entries made in the PDF
-										received through their registered email ID.
-									</span>
-								</li>
-								<li className='flex items-start gap-3'>
-									<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-bold flex items-center justify-center mt-0.5 border border-[#0e2544]/15'>
-										5
-									</span>
-									<span className='flex-1 font-medium'>
-										After verification, sign in the space provided and self-attest the
-										PDF/documents, and submit the duly verified documents in person to the concerned
-										Faculty In-charge.
-									</span>
-								</li>
-							</ol>
-						</div>
+						)}
 					</div>
 
 					{/* SUCCESS CONFIRMATION VIEW */}
 					{submitted ? (
-						<div className='p-6 sm:p-12 text-center bg-white space-y-6'>
-							<div className='w-16 h-16 rounded-2xl bg-emerald-50 border-2 border-emerald-300 text-emerald-600 flex items-center justify-center mx-auto text-3xl shadow-sm'>
-								✓
+						<div className='p-6 sm:p-12 text-center bg-white space-y-7 animate-fadeIn'>
+							<div className='w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center mx-auto text-4xl shadow-lg shadow-emerald-500/20'>
+								<Check className='w-10 h-10 stroke-[2.5]' />
 							</div>
 							<div>
-								<span className='text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100 px-3 py-1 rounded-full border border-emerald-300'>
+								<span className='text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100/90 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs'>
 									Enrollment form submitted
 								</span>
-								<h2 className='text-xl sm:text-3xl font-bold text-[#0e2544] uppercase tracking-tight mt-3'>
+								<h2 className='text-2xl sm:text-3xl font-extrabold text-[#0e2544] uppercase tracking-tight mt-3.5 font-heading'>
 									IIC Cadet Council 2026-27
 								</h2>
 								<p className='text-sm sm:text-base text-slate-600 mt-2 max-w-lg mx-auto leading-relaxed'>
@@ -1003,43 +1066,61 @@ export default function Home() {
 							</div>
 
 							{/* Summary Card */}
-							<div className='text-left bg-slate-50 border border-slate-200 rounded-2xl p-5 sm:p-7 text-sm space-y-4 max-w-xl mx-auto shadow-xs'>
+							<div className='text-left bg-gradient-to-b from-slate-50 to-white border border-slate-200 rounded-2xl p-5 sm:p-7 text-sm space-y-4 max-w-xl mx-auto shadow-sm'>
 								{submittedRefId && (
-									<div className='flex justify-between items-center border-b border-sky-200 pb-3 bg-sky-50 -mx-5 -mt-5 sm:-mx-7 sm:-mt-7 p-4 sm:p-5 rounded-t-2xl'>
+									<div className='flex justify-between items-center border-b border-sky-200 pb-3.5 bg-gradient-to-r from-sky-100/70 to-sky-50 -mx-5 -mt-5 sm:-mx-7 sm:-mt-7 p-4 sm:p-5 rounded-t-2xl'>
 										<div>
-											<span className='text-sky-900 font-bold text-xs uppercase tracking-wider block'>
+											<span className='text-sky-900 font-bold text-[11px] uppercase tracking-wider block'>
 												Application Reference ID:
 											</span>
-											<span className='font-mono font-extrabold text-sky-900 text-base sm:text-lg'>
+											<span className='font-mono font-black text-sky-950 text-base sm:text-xl'>
 												{submittedRefId}
 											</span>
 										</div>
-										<span className='text-xs font-bold text-emerald-800 bg-white px-2.5 py-1 rounded-md border border-emerald-300 shadow-xs'>
-											● Submitted
-										</span>
+										<div className='flex items-center gap-2'>
+											<button
+												type='button'
+												onClick={handleCopyRefId}
+												className='btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 shadow-2xs bg-white'>
+												{copiedRefId ? (
+													<>
+														<CheckCheck className='w-3.5 h-3.5 text-emerald-600' />
+														<span className='text-emerald-700 font-bold'>Copied</span>
+													</>
+												) : (
+													<>
+														<Copy className='w-3.5 h-3.5 text-slate-600' />
+														<span>Copy ID</span>
+													</>
+												)}
+											</button>
+											<span className='text-xs font-bold text-emerald-800 bg-white px-2.5 py-1.5 rounded-lg border border-emerald-300 shadow-2xs'>
+												● Submitted
+											</span>
+										</div>
 									</div>
 								)}
 
-								<div className='flex items-center gap-3.5 pb-3.5 border-b border-slate-200'>
+								<div className='flex items-center gap-4 pb-4 border-b border-slate-200'>
 									{formData.photoDataUrl && (
 										// eslint-disable-next-line @next/next/no-img-element
 										<img
 											src={formData.photoDataUrl}
 											alt='Cadet'
-											className='w-14 h-14 rounded-xl object-cover border border-slate-300 flex-shrink-0'
+											className='w-16 h-16 rounded-2xl object-cover border-2 border-slate-300 shadow-xs flex-shrink-0'
 										/>
 									)}
 									<div>
-										<span className='text-xs text-slate-500 font-semibold block uppercase tracking-wider'>
+										<span className='text-xs text-slate-500 font-bold block uppercase tracking-wider'>
 											Cadet Name
 										</span>
-										<span className='font-bold text-base sm:text-lg text-[#0e2544]'>
+										<span className='font-black text-lg sm:text-xl text-[#0e2544]'>
 											{formData.cadetName}
 										</span>
 									</div>
 								</div>
 
-								<div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm border-b border-slate-200 pb-3.5'>
+								<div className='grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs sm:text-sm border-b border-slate-200 pb-4'>
 									<div>
 										<span className='text-slate-500 font-medium block'>Registration / Roll:</span>
 										<span className='font-mono font-bold text-[#0e2544]'>{formData.regNumber}</span>
@@ -1065,76 +1146,57 @@ export default function Home() {
 								</div>
 
 								{/* Attached Files & Sections Summary */}
-								<div className='space-y-2 text-xs'>
-									<div className='flex items-center justify-between'>
-										<span className='font-bold text-[#0e2544] uppercase tracking-wider block'>
-											Uploaded Documents & Combined Master PDF:
-										</span>
-										<span className='bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[11px] flex items-center gap-1'>
-											<FileStack className='w-3.5 h-3.5' /> {mergedPdfCount || 1} Document(s) Merged
-										</span>
-									</div>
-
-									<div className='p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200 text-emerald-900'>
-										<span className='font-bold block'>
-											✓ Unified Master PDF Sent to Google Drive & Email:
-										</span>
-										<span className='text-[11px] text-emerald-800'>
-											All proofs and certificates have been automatically compiled into a single
-											master document.
-										</span>
-									</div>
-
-									<div className='space-y-1 pt-1'>
-										<div className='flex items-center gap-1.5 text-slate-700'>
-											<CheckCircle2 className='w-4 h-4 text-emerald-600' />
+								<div className='space-y-2.5 text-xs'>
+									<div className='space-y-1.5 pt-1'>
+										<div className='flex items-center gap-2 text-slate-700'>
+											<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 											<span>
 												<strong>Detailed Resume / CV & Proofs:</strong> {formData.resumeName}
 											</span>
 										</div>
 										{formData.hasJournalPub && formData.journalFileName && (
-											<div className='flex items-center gap-1.5 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600' />
+											<div className='flex items-center gap-2 text-slate-700'>
+												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 												<span>
 													<strong>Journal Proof:</strong> {formData.journalFileName}
 												</span>
 											</div>
 										)}
 										{formData.hasBookChapter && formData.bookChapterFileName && (
-											<div className='flex items-center gap-1.5 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600' />
+											<div className='flex items-center gap-2 text-slate-700'>
+												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 												<span>
 													<strong>Book Chapter Proof:</strong> {formData.bookChapterFileName}
 												</span>
 											</div>
 										)}
 										{formData.hasPatents && formData.patentFileName && (
-											<div className='flex items-center gap-1.5 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600' />
+											<div className='flex items-center gap-2 text-slate-700'>
+												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 												<span>
 													<strong>Patent/IPR Proof:</strong> {formData.patentFileName}
 												</span>
 											</div>
 										)}
 										{formData.hasCompetitions && formData.competitionFileName && (
-											<div className='flex items-center gap-1.5 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600' />
+											<div className='flex items-center gap-2 text-slate-700'>
+												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 												<span>
 													<strong>Competition Certificate:</strong> {formData.competitionFileName}
 												</span>
 											</div>
 										)}
 										{formData.hasActivities && formData.activityFileName && (
-											<div className='flex items-center gap-1.5 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600' />
+											<div className='flex items-center gap-2 text-slate-700'>
+												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 												<span>
 													<strong>Activity Certificate:</strong> {formData.activityFileName}
 												</span>
 											</div>
 										)}
 										{formData.hasAchievements && formData.achievementFileName && (
-											<div className='flex items-center gap-1.5 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600' />
+											<div className='flex items-center gap-2 text-slate-700'>
+												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 												<span>
 													<strong>Award/Achievement Proof:</strong> {formData.achievementFileName}
 												</span>
@@ -1145,15 +1207,15 @@ export default function Home() {
 
 								{/* Areas of Interest Summary */}
 								{formData.areasOfInterest.length > 0 && (
-									<div className='pt-2 border-t border-slate-200'>
-										<span className='font-bold text-[#0e2544] uppercase tracking-wider block text-xs mb-1.5'>
+									<div className='pt-2.5 border-t border-slate-200'>
+										<span className='font-bold text-[#0e2544] uppercase tracking-wider block text-xs mb-2'>
 											Innovation Focus Areas:
 										</span>
 										<div className='flex flex-wrap gap-1.5'>
 											{formData.areasOfInterest.map((tag) => (
 												<span
 													key={tag}
-													className='text-[11px] bg-slate-200/80 text-slate-800 px-2 py-0.5 rounded-full font-medium'>
+													className='text-[11px] bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg font-medium border border-slate-200'>
 													{tag}
 												</span>
 											))}
@@ -1161,35 +1223,16 @@ export default function Home() {
 									</div>
 								)}
 							</div>
-
-							<div className='flex flex-col sm:flex-row items-center justify-center gap-3 pt-2'>
-								<button
-									type='button'
-									onClick={() => window.print()}
-									className='btn-secondary w-full sm:w-auto flex items-center gap-2'>
-									<Printer className='w-4 h-4' /> Print / Save PDF Receipt
-								</button>
-								<button
-									type='button'
-									onClick={handleReset}
-									className='btn-primary w-full sm:w-auto'>
-									Register Another Cadet
-								</button>
-							</div>
 						</div>
 					) : (
 						/* MAIN ENROLLMENT FORM */
 						<form onSubmit={handleSubmit} noValidate className='bg-white'>
 							{/* 5-STEP RESPONSIVE TAB BAR (VISIBLE ON ALL SCREENS WITHOUT SCROLLING) */}
-							<div className='border-b border-slate-200 bg-slate-50/80 px-2 sm:px-6 py-2.5 sm:py-3.5'>
-								<div className='grid grid-cols-5 gap-1 sm:gap-2 max-w-4xl mx-auto w-full'>
+							<div className='border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-sky-50/20 to-slate-50 px-2 sm:px-6 py-3 sm:py-4'>
+								<div className='grid grid-cols-5 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto w-full'>
 									{SECTIONS.map((sec) => {
 										const isCurrent = currentStep === sec.id;
-										const isVisited = visitedSteps.includes(sec.id);
-										const isComplete = isStepComplete(sec.id);
-										const isUnfinished = isVisited && !isComplete && !isCurrent;
-										const isCompleted = isVisited && isComplete && !isCurrent;
-										const isUnvisited = !isVisited && !isCurrent;
+										const isCompleted = completedSteps.includes(sec.id) && !isCurrent;
 
 										return (
 											<button
@@ -1199,47 +1242,46 @@ export default function Home() {
 												title={
 													isCurrent
 														? `Current Section: ${sec.title}`
-														: isUnfinished
-															? `${sec.title} (Unfinished / Incomplete)`
-															: isCompleted
-																? `${sec.title} (Completed)`
-																: `${sec.title} (Upcoming)`
+														: isCompleted
+															? `${sec.title} (Completed)`
+															: `${sec.title}`
 												}
-												className={`group relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+												className={`group relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer ${
 													isCurrent
-														? 'bg-[#0e2544] text-white shadow-md ring-2 ring-sky-500/30 scale-[1.02]'
-														: isUnfinished
-															? 'bg-amber-50 text-amber-950 border border-amber-300 hover:bg-amber-100/90 shadow-2xs'
-															: isCompleted
-																? 'bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
-																: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-2xs'
+														? 'bg-gradient-to-r from-[#0e2544] to-[#163866] text-white shadow-md ring-2 ring-sky-400/40 scale-[1.02]'
+														: isCompleted
+															? 'bg-emerald-50 text-emerald-950 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+															: 'bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
 												}`}>
 												<div
-													className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+													className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 transition-transform ${
 														isCurrent
-															? 'bg-sky-500 text-white'
-															: isUnfinished
-																? 'bg-amber-500 text-white'
-																: isCompleted
-																	? 'bg-emerald-600 text-white'
-																	: 'bg-slate-200 text-slate-600'
+															? 'bg-sky-400 text-[#0e2544] shadow-xs'
+															: isCompleted
+																? 'bg-emerald-600 text-white'
+																: 'bg-slate-200 text-slate-600'
 													}`}>
-													{isCurrent || isUnvisited ? (
-														sec.id
-													) : isUnfinished ? (
-														<AlertCircle className='w-3 h-3' />
-													) : (
-														<Check className='w-3 h-3' />
-													)}
+													{isCompleted ? <Check className='w-3 h-3 stroke-[2.5]' /> : sec.id}
 												</div>
 
-												<span className='truncate text-[10px] sm:text-xs tracking-tight text-center font-medium sm:font-bold'>
+												<span className='truncate text-[10px] sm:text-xs tracking-tight text-center font-semibold sm:font-bold'>
 													<span className='sm:hidden'>{sec.shortTitle}</span>
 													<span className='hidden sm:inline'>{sec.title}</span>
 												</span>
 											</button>
 										);
 									})}
+								</div>
+
+								{/* Progress Completion Indicator */}
+								<div className='flex items-center justify-between text-[11px] text-slate-500 font-semibold mt-2.5 px-1 max-w-4xl mx-auto'>
+									<span className='flex items-center gap-1.5'>
+										<Compass className='w-3.5 h-3.5 text-sky-600' />
+										Step {currentStep} of 5 • {SECTIONS[currentStep - 1]?.title}
+									</span>
+									<span className='font-bold text-[#0e2544]'>
+										{progressPercent}% Complete ({completedCount}/5 Steps Completed)
+									</span>
 								</div>
 							</div>
 
@@ -1250,14 +1292,14 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-1'
-									className={`space-y-7 ${currentStep === 1 ? 'block' : 'hidden'}`}>
+									className={`space-y-7 ${currentStep === 1 ? 'block animate-fadeIn' : 'hidden'}`}>
 									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
 										<div className='flex items-center gap-3'>
-											<div className='w-9 h-9 rounded-xl bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												1
+											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
+												<User className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Cadet Profile & Academic Identity
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -1270,11 +1312,13 @@ export default function Home() {
 
 									{/* Row 1: 1. Name of Cadet & 2. Year of Study */}
 									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div id='cadetName'>
+										<div id='cadetName' className='space-y-1.5'>
 											<label
 												htmlFor='cadetNameInput'
-												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												1. Name of the Cadet <span className='text-red-600 font-bold'>*</span>
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<User className='w-3.5 h-3.5 text-sky-700' />
+												<span>1. Name of the Cadet</span>
+												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<input
 												type='text'
@@ -1288,21 +1332,23 @@ export default function Home() {
 												autoComplete='name'
 											/>
 											{errors.cadetName && touched.cadetName ? (
-												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.cadetName}
 												</p>
 											) : (
-												<p className='text-xs text-slate-500 mt-1.5 font-medium'>
+												<p className='text-xs text-slate-500 mt-1 font-medium'>
 													Enter full name as per official IMU records.
 												</p>
 											)}
 										</div>
 
-										<div id='yearOfStudy'>
+										<div id='yearOfStudy' className='space-y-1.5'>
 											<label
 												htmlFor='yearOfStudySelect'
-												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												2. Year of Study <span className='text-red-600 font-bold'>*</span>
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<Calendar className='w-3.5 h-3.5 text-sky-700' />
+												<span>2. Year of Study</span>
+												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<select
 												id='yearOfStudySelect'
@@ -1315,7 +1361,7 @@ export default function Home() {
 												<option value='3rd Year'>3rd Year</option>
 												<option value='4th Year'>4th Year</option>
 											</select>
-											<p className='text-xs text-slate-500 mt-1.5 font-medium'>
+											<p className='text-xs text-slate-500 mt-1 font-medium'>
 												Select your current academic batch.
 											</p>
 										</div>
@@ -1323,15 +1369,16 @@ export default function Home() {
 
 									{/* Row 2: 3. Roll No. / Serial No. & 4. Current Semester */}
 									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div id='regNumber'>
-											<div className='flex items-baseline justify-between gap-1 mb-2 flex-wrap'>
-												<label
-													htmlFor='regNumberInput'
-													className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-													3. {isFirstYear ? '. Reg No/ Serial No.' : 'University Registration No'}{' '}
-													<span className='text-red-600 font-bold'>*</span>
-												</label>
-											</div>
+										<div id='regNumber' className='space-y-1.5'>
+											<label
+												htmlFor='regNumberInput'
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<Hash className='w-3.5 h-3.5 text-sky-700' />
+												<span>
+													3. {isFirstYear ? '. Reg No/ Serial No.' : 'University Registration No'}
+												</span>
+												<span className='text-red-600 font-bold'>*</span>
+											</label>
 											<input
 												type='text'
 												id='regNumberInput'
@@ -1347,23 +1394,25 @@ export default function Home() {
 												className={`form-input font-mono ${errors.regNumber && touched.regNumber ? 'input-error' : ''}`}
 											/>
 											{errors.regNumber && touched.regNumber ? (
-												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.regNumber}
 												</p>
 											) : (
-												<p className='text-xs text-slate-500 mt-1.5 font-medium'>
+												<p className='text-xs text-slate-500 mt-1 font-medium'>
 													{isFirstYear
-														? 'First-year cadets enter your roll number / serial.'
+														? 'First-year cadets enter your registration number / serial number.'
 														: 'Enter your permanent university registration number.'}
 												</p>
 											)}
 										</div>
 
-										<div id='semester'>
+										<div id='semester' className='space-y-1.5'>
 											<label
 												htmlFor='semesterSelect'
-												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												4. Current Semester <span className='text-red-600 font-bold'>*</span>
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<GraduationCap className='w-3.5 h-3.5 text-sky-700' />
+												<span>4. Current Semester</span>
+												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<select
 												id='semesterSelect'
@@ -1377,7 +1426,7 @@ export default function Home() {
 													</option>
 												))}
 											</select>
-											<p className='text-xs text-slate-500 mt-1.5 font-medium'>
+											<p className='text-xs text-slate-500 mt-1 font-medium'>
 												Select ongoing semester.
 											</p>
 										</div>
@@ -1385,11 +1434,12 @@ export default function Home() {
 
 									{/* Row 3: 5. Department & Gender */}
 									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start'>
-										<div>
+										<div className='space-y-1.5'>
 											<label
 												htmlFor='department'
-												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												5. Department / Academic Program{' '}
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<Building2 className='w-3.5 h-3.5 text-sky-700' />
+												<span>5. Department / Academic Program</span>
 												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<select
@@ -1406,18 +1456,18 @@ export default function Home() {
 											</select>
 										</div>
 
-										<div>
-											<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
+										<div className='space-y-1.5'>
+											<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 												Gender <span className='text-red-600 font-bold'>*</span>
 											</label>
-											<div className='flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 h-[46px]'>
+											<div className='flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200/90 h-[46px]'>
 												{['Male', 'Female'].map((g) => (
 													<label
 														key={g}
 														className={`flex-1 text-center h-full flex items-center justify-center rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer touch-manipulation transition-all ${
 															formData.gender === g
-																? 'bg-[#0e2544] text-white shadow-sm'
-																: 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/60'
+																? 'bg-[#0e2544] text-white shadow-xs'
+																: 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/70'
 														}`}>
 														<input
 															type='radio'
@@ -1436,11 +1486,13 @@ export default function Home() {
 
 									{/* Row 4: 6. Email Address & 7. Mobile Number */}
 									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div id='email'>
+										<div id='email' className='space-y-1.5'>
 											<label
 												htmlFor='emailInput'
-												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												6. Email Address <span className='text-red-600 font-bold'>*</span>
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<Mail className='w-3.5 h-3.5 text-sky-700' />
+												<span>6. Email Address</span>
+												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<input
 												type='email'
@@ -1454,17 +1506,19 @@ export default function Home() {
 												autoComplete='email'
 											/>
 											{errors.email && touched.email && (
-												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.email}
 												</p>
 											)}
 										</div>
 
-										<div id='phone'>
+										<div id='phone' className='space-y-1.5'>
 											<label
 												htmlFor='phoneInput'
-												className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-2'>
-												7. Mobile Number <span className='text-red-600 font-bold'>*</span>
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<Phone className='w-3.5 h-3.5 text-sky-700' />
+												<span>7. Mobile Number</span>
+												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<input
 												type='tel'
@@ -1478,7 +1532,7 @@ export default function Home() {
 												autoComplete='tel'
 											/>
 											{errors.phone && touched.phone && (
-												<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.phone}
 												</p>
 											)}
@@ -1488,14 +1542,14 @@ export default function Home() {
 									{/* Passport Size Photo Upload */}
 									<div
 										id='photo'
-										className='p-5 rounded-2xl border border-slate-200/90 bg-slate-50/70'>
+										className='p-5 sm:p-6 rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50 via-sky-50/20 to-slate-50 shadow-2xs'>
 										<label
 											htmlFor='photoInput'
 											className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
 											Passport Size Photo <span className='text-red-600 font-bold'>*</span>
 										</label>
-										<p className='text-xs text-slate-500 mb-3.5'>
-											Upload a clear passport size photograph (PNG or JPG).
+										<p className='text-xs text-slate-500 mb-4'>
+											Upload a clear passport size photograph (PNG, JPEG or JPG).
 										</p>
 
 										<div className='flex items-center gap-4 flex-wrap sm:flex-nowrap'>
@@ -1504,17 +1558,17 @@ export default function Home() {
 												<img
 													src={formData.photoDataUrl}
 													alt='Cadet Preview'
-													className='w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-slate-300 shadow-xs flex-shrink-0'
+													className='w-20 h-20 sm:w-22 sm:h-22 rounded-2xl object-cover border-2 border-sky-600 shadow-sm flex-shrink-0'
 												/>
 											) : (
-												<div className='w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-slate-200 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 text-[10px] font-bold flex-shrink-0'>
+												<div className='w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-white border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 text-[10px] font-bold flex-shrink-0 shadow-2xs'>
 													<User className='w-7 h-7 mb-0.5 text-slate-400' />
 													PHOTO
 												</div>
 											)}
 											<div className='flex-1 min-w-[200px]'>
-												<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all'>
-													<Upload className='w-4 h-4' />
+												<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all hover:border-slate-400'>
+													<Upload className='w-4 h-4 text-sky-700' />
 													<span>{formData.photoName ? 'Change Photo' : 'Select Photo'}</span>
 													<input
 														type='file'
@@ -1527,17 +1581,17 @@ export default function Home() {
 												</label>
 												<p className='text-xs text-slate-600 font-medium truncate mt-2'>
 													{formData.photoName ? (
-														<span className='font-bold text-emerald-700 flex items-center gap-1'>
-															<Check className='w-4 h-4' /> {formData.photoName}
+														<span className='font-bold text-emerald-700 flex items-center gap-1.5'>
+															<Check className='w-4 h-4 text-emerald-600' /> {formData.photoName}
 														</span>
 													) : (
-														'Accepts JPG, PNG, WEBP up to 15MB'
+														'Accepts JPG, JPEG, PNG, up to 10MB'
 													)}
 												</p>
 											</div>
 										</div>
 										{errors.photo && touched.photo && (
-											<p className='text-xs font-semibold text-red-600 mt-2.5 flex items-center gap-1.5'>
+											<p className='text-xs font-semibold text-red-600 mt-2.5 flex items-center gap-1.5 animate-fadeIn'>
 												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.photo}
 											</p>
 										)}
@@ -1549,14 +1603,14 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-2'
-									className={`space-y-7 ${currentStep === 2 ? 'block' : 'hidden'}`}>
+									className={`space-y-7 ${currentStep === 2 ? 'block animate-fadeIn' : 'hidden'}`}>
 									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
 										<div className='flex items-center gap-3'>
-											<div className='w-9 h-9 rounded-xl bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												2
+											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
+												<GraduationCap className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Academic & Research Profile
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -1564,7 +1618,7 @@ export default function Home() {
 												</p>
 											</div>
 										</div>
-										<span className='section-badge'>Section 2 of 6</span>
+										<span className='section-badge'>Section 2 of 5</span>
 									</div>
 
 									{/* Question 8: Current CGPA */}
@@ -1605,7 +1659,7 @@ export default function Home() {
 													}`}
 												/>
 												{errors.cgpa && touched.cgpa && !isFirstYear && (
-													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.cgpa}
 													</p>
 												)}
@@ -1653,7 +1707,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -1684,7 +1738,7 @@ export default function Home() {
 														className={`form-input resize-none ${errors.journalDetails && touched.journalDetails ? 'input-error' : ''}`}
 													/>
 													{errors.journalDetails && touched.journalDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.journalDetails}
 														</p>
@@ -1692,8 +1746,8 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
-														<Upload className='w-4 h-4' />
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
+														<Upload className='w-4 h-4 text-sky-700' />
 														<span>{formData.journalFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -1738,7 +1792,7 @@ export default function Home() {
 													)}
 												</div>
 												{errors.journalFile && touched.journalFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.journalFile}
 													</p>
 												)}
@@ -1785,7 +1839,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -1815,7 +1869,7 @@ export default function Home() {
 														className={`form-input resize-none ${errors.bookChapterDetails && touched.bookChapterDetails ? 'input-error' : ''}`}
 													/>
 													{errors.bookChapterDetails && touched.bookChapterDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.bookChapterDetails}
 														</p>
@@ -1823,8 +1877,8 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
-														<Upload className='w-4 h-4' />
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
+														<Upload className='w-4 h-4 text-sky-700' />
 														<span>
 															{formData.bookChapterFileName ? 'Change PDF' : 'Upload PDF'}
 														</span>
@@ -1871,7 +1925,7 @@ export default function Home() {
 													)}
 												</div>
 												{errors.bookChapterFile && touched.bookChapterFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 														{errors.bookChapterFile}
 													</p>
@@ -1916,7 +1970,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -1946,7 +2000,7 @@ export default function Home() {
 														className={`form-input resize-none ${errors.patentDetails && touched.patentDetails ? 'input-error' : ''}`}
 													/>
 													{errors.patentDetails && touched.patentDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.patentDetails}
 														</p>
@@ -1954,8 +2008,8 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
-														<Upload className='w-4 h-4' />
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
+														<Upload className='w-4 h-4 text-sky-700' />
 														<span>{formData.patentFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -2000,7 +2054,7 @@ export default function Home() {
 													)}
 												</div>
 												{errors.patentFile && touched.patentFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.patentFile}
 													</p>
 												)}
@@ -2047,7 +2101,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -2080,7 +2134,7 @@ export default function Home() {
 														className={`form-input resize-none ${errors.competitionDetails && touched.competitionDetails ? 'input-error' : ''}`}
 													/>
 													{errors.competitionDetails && touched.competitionDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5'>
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.competitionDetails}
 														</p>
@@ -2088,8 +2142,8 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
-														<Upload className='w-4 h-4' />
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
+														<Upload className='w-4 h-4 text-sky-700' />
 														<span>
 															{formData.competitionFileName ? 'Change PDF' : 'Upload PDF'}
 														</span>
@@ -2136,7 +2190,7 @@ export default function Home() {
 													)}
 												</div>
 												{errors.competitionFile && touched.competitionFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5'>
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 														{errors.competitionFile}
 													</p>
@@ -2151,14 +2205,14 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-3'
-									className={`space-y-6 ${currentStep === 3 ? 'block' : 'hidden'}`}>
+									className={`space-y-6 ${currentStep === 3 ? 'block animate-fadeIn' : 'hidden'}`}>
 									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
 										<div className='flex items-center gap-2.5'>
-											<div className='w-8 h-8 rounded-lg bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm'>
-												3
+											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
+												<Award className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide'>
+												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Co-Curricular & Leadership Profile
 												</h2>
 												<p className='text-xs text-slate-500 font-medium'>
@@ -2177,7 +2231,7 @@ export default function Home() {
 													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
 														13. Technical / Co-Curricular Activities, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-full'>
 														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
@@ -2208,7 +2262,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -2239,15 +2293,15 @@ export default function Home() {
 														className={`form-input resize-none ${errors.activityDetails && touched.activityDetails ? 'input-error' : ''}`}
 													/>
 													{errors.activityDetails && touched.activityDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1 animate-fadeIn'>
 															<AlertCircle className='w-3.5 h-3.5' /> {errors.activityDetails}
 														</p>
 													)}
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
-														<Upload className='w-3.5 h-3.5' />
+													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs hover:border-slate-400'>
+														<Upload className='w-3.5 h-3.5 text-sky-700' />
 														<span>{formData.activityFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -2266,7 +2320,8 @@ export default function Home() {
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.activityFileName ? (
 															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4' /> {formData.activityFileName}
+																<FileCheck className='w-4 h-4 text-emerald-600' />{' '}
+																{formData.activityFileName}
 															</span>
 														) : (
 															<span className='text-slate-500'>
@@ -2291,7 +2346,7 @@ export default function Home() {
 													)}
 												</div>
 												{errors.activityFile && touched.activityFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1 animate-fadeIn'>
 														<AlertCircle className='w-3.5 h-3.5' /> {errors.activityFile}
 													</p>
 												)}
@@ -2307,7 +2362,7 @@ export default function Home() {
 													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
 														14. Major Achievements / Awards, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-full'>
 														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
@@ -2337,7 +2392,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -2370,15 +2425,15 @@ export default function Home() {
 														className={`form-input resize-none ${errors.achievementDetails && touched.achievementDetails ? 'input-error' : ''}`}
 													/>
 													{errors.achievementDetails && touched.achievementDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1 animate-fadeIn'>
 															<AlertCircle className='w-3.5 h-3.5' /> {errors.achievementDetails}
 														</p>
 													)}
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs'>
-														<Upload className='w-3.5 h-3.5' />
+													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs hover:border-slate-400'>
+														<Upload className='w-3.5 h-3.5 text-sky-700' />
 														<span>
 															{formData.achievementFileName ? 'Change PDF' : 'Upload PDF'}
 														</span>
@@ -2399,7 +2454,8 @@ export default function Home() {
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.achievementFileName ? (
 															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4' /> {formData.achievementFileName}
+																<FileCheck className='w-4 h-4 text-emerald-600' />{' '}
+																{formData.achievementFileName}
 															</span>
 														) : (
 															<span className='text-slate-500'>
@@ -2424,7 +2480,7 @@ export default function Home() {
 													)}
 												</div>
 												{errors.achievementFile && touched.achievementFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1'>
+													<p className='text-xs font-semibold text-red-600 flex items-center gap-1 animate-fadeIn'>
 														<AlertCircle className='w-3.5 h-3.5' /> {errors.achievementFile}
 													</p>
 												)}
@@ -2440,7 +2496,7 @@ export default function Home() {
 													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
 														15. Leadership / Coordinator Positions Held, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded'>
+													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-full'>
 														Note:- Not applicable for first semester cadets.
 													</span>
 												</div>
@@ -2467,7 +2523,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -2498,7 +2554,7 @@ export default function Home() {
 														className={`form-input resize-none ${errors.leadershipDetails && touched.leadershipDetails ? 'input-error' : ''}`}
 													/>
 													{errors.leadershipDetails && touched.leadershipDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1'>
+														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1 animate-fadeIn'>
 															<AlertCircle className='w-3.5 h-3.5' /> {errors.leadershipDetails}
 														</p>
 													)}
@@ -2513,14 +2569,14 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-4'
-									className={`space-y-6 ${currentStep === 4 ? 'block' : 'hidden'}`}>
+									className={`space-y-6 ${currentStep === 4 ? 'block animate-fadeIn' : 'hidden'}`}>
 									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
 										<div className='flex items-center gap-2.5'>
-											<div className='w-8 h-8 rounded-lg bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm'>
-												4
+											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
+												<Lightbulb className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide'>
+												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Innovation & Problem-Solving
 												</h2>
 												<p className='text-xs text-slate-500 font-medium'>
@@ -2532,62 +2588,76 @@ export default function Home() {
 									</div>
 
 									{/* Question 16: Maritime / University Ecosystem Problem */}
-									<div className='section-container space-y-2'>
+									<div id='problemMaritime' className='section-container space-y-2'>
 										<label
-											htmlFor='problemMaritime'
+											htmlFor='problemMaritimeInput'
 											className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
 											16. Problem in the Indian Maritime University Ecosystem you would like to
-											solve
+											solve <span className='text-red-600 font-bold'>*</span>
 										</label>
 										<p className='text-xs text-slate-600 leading-relaxed'>
 											Briefly describe the problem and why you think it needs to be addressed.
 										</p>
 										<textarea
-											id='problemMaritime'
+											id='problemMaritimeInput'
 											name='problemMaritime'
 											rows={4}
 											value={formData.problemMaritime}
 											onChange={handleChange}
+											onBlur={handleBlur}
 											placeholder='Describe a specific operational, technological, ecological, or campus ecosystem challenge and your proposed angle of solution...'
-											className='form-input resize-y'
+											className={`form-input resize-y ${errors.problemMaritime && touched.problemMaritime ? 'input-error' : ''}`}
 										/>
-										<div className='flex justify-end text-[11px] text-slate-400'>
+										{errors.problemMaritime && touched.problemMaritime && (
+											<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1.5 animate-fadeIn'>
+												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.problemMaritime}
+											</p>
+										)}
+										<div className='flex justify-end text-[11px] text-slate-400 font-mono font-semibold'>
 											{formData.problemMaritime.length} characters
 										</div>
 									</div>
 
 									{/* Question 17: Problem in Society */}
-									<div className='section-container space-y-2'>
+									<div id='problemSociety' className='section-container space-y-2'>
 										<label
-											htmlFor='problemSociety'
+											htmlFor='problemSocietyInput'
 											className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-											17. Problem in Society you would like to solve
+											17. Problem in Society you would like to solve{' '}
+											<span className='text-red-600 font-bold'>*</span>
 										</label>
 										<p className='text-xs text-slate-600 leading-relaxed'>
 											Briefly describe the problem and why you think it needs to be addressed.
 										</p>
 										<textarea
-											id='problemSociety'
+											id='problemSocietyInput'
 											name='problemSociety'
 											rows={4}
 											value={formData.problemSociety}
 											onChange={handleChange}
+											onBlur={handleBlur}
 											placeholder='Describe a broader social, environmental, energy, or civic problem that motivates your passion for innovation...'
-											className='form-input resize-y'
+											className={`form-input resize-y ${errors.problemSociety && touched.problemSociety ? 'input-error' : ''}`}
 										/>
-										<div className='flex justify-end text-[11px] text-slate-400'>
+										{errors.problemSociety && touched.problemSociety && (
+											<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1.5 animate-fadeIn'>
+												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.problemSociety}
+											</p>
+										)}
+										<div className='flex justify-end text-[11px] text-slate-400 font-mono font-semibold'>
 											{formData.problemSociety.length} characters
 										</div>
 									</div>
 
 									{/* Question 18: Area(s) of Innovation / Technology Interest */}
-									<div className='section-container space-y-3'>
+									<div id='areasOfInterest' className='section-container space-y-3.5'>
 										<div>
 											<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-												18. Which area(s) of innovation / technology interest you most?
+												18. Which area(s) of innovation / technology interest you most?{' '}
+												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<p className='text-xs text-slate-600 mt-0.5'>
-												Select all domains that resonate with your interests or type custom areas.
+												Select at least 1 innovation domain from below or add custom areas.
 											</p>
 										</div>
 
@@ -2602,7 +2672,7 @@ export default function Home() {
 														onClick={() => toggleInterest(tag)}
 														className={`interest-tag-chip ${active ? 'active' : ''}`}>
 														{active ? (
-															<Check className='w-3.5 h-3.5' />
+															<Check className='w-3.5 h-3.5 stroke-[2.5]' />
 														) : (
 															<Plus className='w-3.5 h-3.5' />
 														)}
@@ -2632,13 +2702,19 @@ export default function Home() {
 											<button
 												type='button'
 												onClick={handleAddCustomInterest}
-												className='btn-secondary whitespace-nowrap text-xs flex items-center gap-1'>
-												<Plus className='w-3.5 h-3.5' /> Add Area
+												className='btn-secondary whitespace-nowrap text-xs flex items-center gap-1.5'>
+												<Plus className='w-3.5 h-3.5 text-sky-700' /> Add Area
 											</button>
 										</div>
 
+										{errors.areasOfInterest && (
+											<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1.5 animate-fadeIn'>
+												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.areasOfInterest}
+											</p>
+										)}
+
 										{formData.areasOfInterest.length > 0 && (
-											<p className='text-xs font-semibold text-emerald-800 mt-1 flex items-center gap-1'>
+											<p className='text-xs font-bold text-emerald-800 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 												<Sparkles className='w-3.5 h-3.5 text-amber-500' />
 												Selected ({formData.areasOfInterest.length}) domains
 											</p>
@@ -2651,14 +2727,14 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-5'
-									className={`space-y-7 ${currentStep === 5 ? 'block' : 'hidden'}`}>
+									className={`space-y-7 ${currentStep === 5 ? 'block animate-fadeIn' : 'hidden'}`}>
 									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
 										<div className='flex items-center gap-3'>
-											<div className='w-9 h-9 rounded-xl bg-[#0e2544] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												5
+											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
+												<ShieldCheck className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Supporting Documents & Official Declaration
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -2679,13 +2755,13 @@ export default function Home() {
 														className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 														19. Upload Detailed Resume / CV (PDF)
 													</label>
-													<span className='text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded-full'>
+													<span className='text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded-full'>
 														Recommended
 													</span>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
 													Upload your latest CV/resume in PDF format (strongly recommended for
-													council evaluation, or select N/A if not available).
+													council evaluation, or select NIL if not available).
 												</span>
 											</div>
 
@@ -2707,7 +2783,7 @@ export default function Home() {
 															? 'bg-[#0e2544] text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													Not Applicable (N/A)
+													NIL
 												</button>
 												<button
 													type='button'
@@ -2724,21 +2800,21 @@ export default function Home() {
 
 										{formData.hasResume && (
 											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
-												<div className='p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-sky-50 to-slate-50 border border-sky-200/90 text-sky-950 text-xs sm:text-[13px] leading-relaxed space-y-1.5 shadow-2xs'>
+												<div className='p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-sky-50 to-slate-50 border border-sky-200 text-sky-950 text-xs sm:text-[13px] leading-relaxed space-y-1.5 shadow-2xs'>
 													<span className='font-bold text-sky-950 block'>
 														📌 Automatic Single Master PDF Storage:
 													</span>
-													<p className='text-sky-900'>
+													<p className='text-sky-900 font-medium'>
 														• Includes: Latest Resume, Semester Marksheets, Certificate Proofs,
 														Awards & Positions.
 													</p>
-													<p className='text-sky-900'>
-														• Accepted Format: <strong>.pdf</strong> (Maximum size: 25MB).
+													<p className='text-sky-900 font-medium'>
+														• Accepted Format: <strong>.pdf</strong> (Maximum size: 15MB).
 													</p>
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
-													<label className='inline-flex items-center justify-center gap-2 px-5 py-3 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0'>
+													<label className='inline-flex items-center justify-center gap-2 px-5 py-3 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
 														<Upload className='w-4 h-4 text-sky-700' />
 														<span>
 															{formData.resumeName ? 'Change Resume PDF' : 'Upload Resume PDF'}
@@ -2758,7 +2834,7 @@ export default function Home() {
 													<div className='flex-1 min-w-0'>
 														{formData.resumeName ? (
 															<div className='flex items-center justify-between gap-2 bg-emerald-50 p-3 rounded-xl border border-emerald-200'>
-																<span className='text-xs sm:text-sm font-bold text-emerald-800 truncate flex items-center gap-1.5'>
+																<span className='text-xs sm:text-sm font-bold text-emerald-900 truncate flex items-center gap-1.5'>
 																	<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 																	{formData.resumeName}
 																</span>
@@ -2777,14 +2853,14 @@ export default function Home() {
 															</div>
 														) : (
 															<span className='text-xs sm:text-sm text-slate-500 font-medium'>
-																No file chosen yet (.pdf up to 25MB)
+																No file chosen yet (.pdf up to 15MB)
 															</span>
 														)}
 													</div>
 												</div>
 
 												{errors.resume && (
-													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.resume}
 													</p>
 												)}
@@ -2800,7 +2876,7 @@ export default function Home() {
 										</label>
 
 										{/* Declaration Statement Box */}
-										<div className='p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100/70 border-l-4 border-[#0e2544] border-y border-r border-slate-200/90 text-slate-800 text-xs sm:text-sm leading-relaxed shadow-xs'>
+										<div className='declaration-certificate-box p-5 sm:p-6 text-slate-800 text-xs sm:text-sm leading-relaxed'>
 											<strong className='text-[#0e2544] font-bold block mb-2 uppercase tracking-wide text-xs font-heading'>
 												Declaration Statement:
 											</strong>
@@ -2829,7 +2905,7 @@ export default function Home() {
 														setErrors((prev) => ({ ...prev, declarationAccepted: '' }));
 													}
 												}}
-												className='mt-1 w-4 h-4 text-[#0e2544] rounded border-slate-300 focus:ring-[#0e2544]'
+												className='mt-1 w-4 h-4 text-[#0e2544] rounded border-slate-300 focus:ring-[#0e2544] cursor-pointer'
 											/>
 											<div className='text-xs sm:text-sm text-slate-800 font-semibold leading-relaxed select-none'>
 												I have read, understood, and solemnly accept the Declaration above.
@@ -2837,7 +2913,7 @@ export default function Home() {
 										</label>
 
 										{errors.declarationAccepted && touched.declarationAccepted && (
-											<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5'>
+											<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5 animate-fadeIn'>
 												<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 												{errors.declarationAccepted}
 											</p>
@@ -2864,7 +2940,7 @@ export default function Home() {
 								{/* ======================================================== */}
 								{/* STEP NAVIGATION & SUBMIT CONTROLS */}
 								{/* ======================================================== */}
-								<div className='pt-7 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3.5'>
+								<div className='pt-7 border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between gap-3.5'>
 									<div className='flex items-center gap-2.5 w-full sm:w-auto'>
 										<button
 											type='button'
@@ -2897,7 +2973,7 @@ export default function Home() {
 											<button
 												type='submit'
 												disabled={submitting}
-												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 bg-emerald-800 hover:bg-emerald-900 border-emerald-900 shadow-md'>
+												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-800 to-teal-800 hover:from-emerald-900 hover:to-teal-900 border-emerald-900 shadow-md'>
 												<ShieldCheck className='w-4 h-4' />
 												<span>
 													{submitting ? 'Submitting Application...' : 'Submit Enrollment Form'}
@@ -2914,6 +2990,9 @@ export default function Home() {
 				{/* Footer note */}
 				<p className='text-center text-xs sm:text-sm text-slate-700 md:text-slate-500 font-bold uppercase tracking-wider mt-6 select-none'>
 					Indian Maritime University • Kolkata Campus • IIC 2026–27
+				</p>
+				<p aria-hidden='true' className='text-center opacity-0'>
+					Developed by Sreeram R
 				</p>
 			</div>
 		</main>
