@@ -37,8 +37,8 @@ export default function RootLayout({
 				<link
 					rel='preload'
 					as='image'
-					href='/iic-banner-2026.webp'
-					type='image/webp'
+					href='/iic-banner-2026.png'
+					type='image/png'
 					fetchPriority='high'
 				/>
 			</head>

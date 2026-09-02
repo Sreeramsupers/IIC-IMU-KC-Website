@@ -3,7 +3,7 @@
 import React, { useState, useEffect, FormEvent, ChangeEvent, FocusEvent } from 'react';
 import Image from 'next/image';
 import confetti from 'canvas-confetti';
-import { PDFDocument } from 'pdf-lib';
+import { generateMasterCombinedPdf } from './lib/generateMasterPdf';
 import {
 	User,
 	GraduationCap,
@@ -45,7 +45,7 @@ export interface FormData {
 	photoName: string;
 	photoDataUrl?: string;
 
-	// Section 2: Academic & Research Profile (Q8 - Q12)
+	// Section 2: Academic & Research Profile (Q8 - Q11)
 	cgpa: string;
 	marksheetStatus: 'combined_pdf' | 'separate_pdf' | 'na_first_year';
 	marksheetName: string;
@@ -55,11 +55,6 @@ export interface FormData {
 	journalDetails: string;
 	journalFileName: string;
 	journalFileDataUrl?: string;
-
-	hasBookChapter: boolean;
-	bookChapterDetails: string;
-	bookChapterFileName: string;
-	bookChapterFileDataUrl?: string;
 
 	hasPatents: boolean;
 	patentDetails: string;
@@ -71,7 +66,7 @@ export interface FormData {
 	competitionFileName: string;
 	competitionFileDataUrl?: string;
 
-	// Section 3: Co-Curricular & Leadership Profile (Q13 - Q15)
+	// Section 3: Co-Curricular & Leadership Profile (Q12 - Q14)
 	hasActivities: boolean;
 	activityDetails: string;
 	activityFileName: string;
@@ -87,18 +82,17 @@ export interface FormData {
 	leadershipFileName: string;
 	leadershipFileDataUrl?: string;
 
-	// Section 4: Innovation & Problem-Solving (Q16 - Q18)
+	// Section 4: Innovation & Problem-Solving (Q15 - Q17)
 	problemMaritime: string;
 	problemSociety: string;
 	areasOfInterest: string[];
 	customInterest: string;
 
-	// Section 5: Supporting Information (Q19)
+	// Section 5: Supporting Documents & Declaration (Q18 - Q19)
 	hasResume: boolean;
 	resumeName: string;
 	resumeDataUrl?: string;
 
-	// Section 6: Declaration (Q20)
 	declarationAccepted: boolean;
 }
 
@@ -123,11 +117,6 @@ const INITIAL_STATE: FormData = {
 	journalDetails: '',
 	journalFileName: '',
 	journalFileDataUrl: '',
-
-	hasBookChapter: false,
-	bookChapterDetails: '',
-	bookChapterFileName: '',
-	bookChapterFileDataUrl: '',
 
 	hasPatents: false,
 	patentDetails: '',
@@ -159,12 +148,17 @@ const INITIAL_STATE: FormData = {
 	areasOfInterest: [],
 	customInterest: '',
 
-	hasResume: true,
+	hasResume: false,
 	resumeName: '',
 	resumeDataUrl: '',
 
 	declarationAccepted: false,
 };
+
+const DEPARTMENTS = [
+	'B.Tech Marine Engineering',
+	'MBA (International Transportation & Logistics Management)',
+];
 
 const SEMESTERS = [
 	'Semester 1',
@@ -175,11 +169,6 @@ const SEMESTERS = [
 	'Semester 6',
 	'Semester 7',
 	'Semester 8',
-];
-
-const DEPARTMENTS = [
-	'B.Tech Marine Engineering',
-	'MBA (International Transportation & Logistics Management)',
 ];
 
 const SUGGESTED_INTERESTS = [
@@ -199,71 +188,11 @@ const SUGGESTED_INTERESTS = [
 
 const SECTIONS = [
 	{ id: 1, title: 'Cadet Profile', shortTitle: 'Profile', icon: User, badge: 'Q1–Q7' },
-	{
-		id: 2,
-		title: 'Academic & Research',
-		shortTitle: 'Academic',
-		icon: GraduationCap,
-		badge: 'Q8–Q12',
-	},
-	{ id: 3, title: 'Co-Curricular', shortTitle: 'Activities', icon: Award, badge: 'Q13–Q15' },
-	{ id: 4, title: 'Innovation', shortTitle: 'Innovation', icon: Lightbulb, badge: 'Q16–Q18' },
-	{ id: 5, title: 'Declaration', shortTitle: 'Declaration', icon: ShieldCheck, badge: 'Q19–Q20' },
+	{ id: 2, title: 'Academic & Research', shortTitle: 'Academic', icon: GraduationCap, badge: 'Q8–Q11' },
+	{ id: 3, title: 'Co-Curricular', shortTitle: 'Activities', icon: Award, badge: 'Q12–Q14' },
+	{ id: 4, title: 'Innovation', shortTitle: 'Innovation', icon: Lightbulb, badge: 'Q15–Q17' },
+	{ id: 5, title: 'Declaration', shortTitle: 'Declaration', icon: ShieldCheck, badge: 'Q18–Q19' },
 ];
-
-// Helper to merge all uploaded PDFs into a single unified master PDF
-async function mergeAllPdfs(
-	pdfList: { name: string; dataUrl: string }[],
-): Promise<{ mergedDataUrl: string; mergedCount: number }> {
-	const validPdfs = pdfList.filter(
-		(item) => item.dataUrl && item.dataUrl.startsWith('data:application/pdf'),
-	);
-
-	if (validPdfs.length === 0) {
-		return { mergedDataUrl: '', mergedCount: 0 };
-	}
-
-	if (validPdfs.length === 1) {
-		return { mergedDataUrl: validPdfs[0].dataUrl, mergedCount: 1 };
-	}
-
-	try {
-		const mergedDoc = await PDFDocument.create();
-
-		for (const item of validPdfs) {
-			try {
-				const res = await fetch(item.dataUrl);
-				const buffer = await res.arrayBuffer();
-				const doc = await PDFDocument.load(buffer, { ignoreEncryption: true });
-				const copiedPages = await mergedDoc.copyPages(doc, doc.getPageIndices());
-				copiedPages.forEach((page) => mergedDoc.addPage(page));
-			} catch (itemErr) {
-				console.warn(`Could not merge PDF from ${item.name}:`, itemErr);
-			}
-		}
-
-		const mergedBytes = await mergedDoc.save();
-		const mergedDataUrl = await new Promise<string>((resolve, reject) => {
-			const blob = new Blob([mergedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-			const reader = new FileReader();
-			reader.onload = () => resolve(reader.result as string);
-			reader.onerror = reject;
-			reader.readAsDataURL(blob);
-		});
-
-		return {
-			mergedDataUrl,
-			mergedCount: validPdfs.length,
-		};
-	} catch (err) {
-		console.error('Error combining PDFs:', err);
-		// Fallback to the main resume PDF
-		return {
-			mergedDataUrl: validPdfs[0].dataUrl,
-			mergedCount: validPdfs.length,
-		};
-	}
-}
 
 export default function Home() {
 	const [formData, setFormData] = useState<FormData>(INITIAL_STATE);
@@ -276,6 +205,8 @@ export default function Home() {
 	const [submittedRefId, setSubmittedRefId] = useState('');
 	const [draftSaved, setDraftSaved] = useState(false);
 	const [copiedRefId, setCopiedRefId] = useState(false);
+	const [masterPdfUrl, setMasterPdfUrl] = useState<string>('');
+	const [masterPdfPageCount, setMasterPdfPageCount] = useState<number>(0);
 
 	const isFirstYear = formData.yearOfStudy === '1st Year';
 
@@ -293,7 +224,6 @@ export default function Home() {
 						resumeDataUrl: '',
 						marksheetDataUrl: '',
 						journalFileDataUrl: '',
-						bookChapterFileDataUrl: '',
 						patentFileDataUrl: '',
 						competitionFileDataUrl: '',
 						activityFileDataUrl: '',
@@ -317,7 +247,6 @@ export default function Home() {
 			delete safeData.resumeDataUrl;
 			delete safeData.marksheetDataUrl;
 			delete safeData.journalFileDataUrl;
-			delete safeData.bookChapterFileDataUrl;
 			delete safeData.patentFileDataUrl;
 			delete safeData.competitionFileDataUrl;
 			delete safeData.activityFileDataUrl;
@@ -448,7 +377,7 @@ export default function Home() {
 			if (!file.type.startsWith('image/')) {
 				setErrors((prev) => ({
 					...prev,
-					photo: 'Please select a valid image file (PNG, JPG, JPEG, WEBP).',
+					photo: 'Please select a valid image file (PNG, JPG, JPEG).',
 				}));
 				return;
 			}
@@ -593,11 +522,6 @@ export default function Home() {
 				(!formData.journalDetails.trim() || !formData.journalFileDataUrl)
 			)
 				return false;
-			if (
-				formData.hasBookChapter &&
-				(!formData.bookChapterDetails.trim() || !formData.bookChapterFileDataUrl)
-			)
-				return false;
 			if (formData.hasPatents && (!formData.patentDetails.trim() || !formData.patentFileDataUrl))
 				return false;
 			if (
@@ -668,14 +592,6 @@ export default function Home() {
 				}
 				if (!formData.journalFileDataUrl) {
 					newErrors.journalFile = 'Please upload the publication PDF.';
-				}
-			}
-			if (formData.hasBookChapter) {
-				if (!formData.bookChapterDetails.trim()) {
-					newErrors.bookChapterDetails = 'Please enter book chapter title and details.';
-				}
-				if (!formData.bookChapterFileDataUrl) {
-					newErrors.bookChapterFile = 'Please upload the book chapter PDF.';
 				}
 			}
 			if (formData.hasPatents) {
@@ -819,28 +735,33 @@ export default function Home() {
 			const generatedRefId = `IIC-2627-${Math.floor(1000 + Math.random() * 9000)}`;
 			setSubmittedRefId(generatedRefId);
 
-			// Collect all PDFs uploaded across all sections and combine into a single master PDF
-			const pdfsToMerge = [
-				{ name: 'Detailed Resume & Proofs (Q19)', dataUrl: formData.resumeDataUrl || '' },
-				{ name: 'Marksheet Proof (Q8)', dataUrl: formData.marksheetDataUrl || '' },
-				{ name: 'Journal Publication First Page (Q9)', dataUrl: formData.journalFileDataUrl || '' },
-				{ name: 'Book Chapter First Page (Q10)', dataUrl: formData.bookChapterFileDataUrl || '' },
-				{ name: 'Patent / IPR Certificate (Q11)', dataUrl: formData.patentFileDataUrl || '' },
-				{ name: 'Competition Certificate (Q12)', dataUrl: formData.competitionFileDataUrl || '' },
-				{ name: 'Activity Certificate (Q13)', dataUrl: formData.activityFileDataUrl || '' },
-				{ name: 'Achievement Certificate (Q14)', dataUrl: formData.achievementFileDataUrl || '' },
+			// Collect all documents/proofs uploaded across all sections and combine into a single master PDF
+			const attachmentsToMerge = [
+				{ name: 'Detailed Resume & CV (Q18)', dataUrl: formData.resumeDataUrl || '' },
+				{ name: 'Semester Marksheet Proof (Q8)', dataUrl: formData.marksheetDataUrl || '' },
+				{ name: 'Journal / Book Chapter Proof (Q9)', dataUrl: formData.journalFileDataUrl || '' },
+				{ name: 'Patent / IPR Certificate (Q10)', dataUrl: formData.patentFileDataUrl || '' },
+				{ name: 'Competition Certificate (Q11)', dataUrl: formData.competitionFileDataUrl || '' },
+				{ name: 'Activity Certificate (Q12)', dataUrl: formData.activityFileDataUrl || '' },
+				{ name: 'Achievement Certificate (Q13)', dataUrl: formData.achievementFileDataUrl || '' },
 			].filter((p) => p.dataUrl && p.dataUrl.length > 0);
 
 			console.log(
-				`[PDF Merge] Combining ${pdfsToMerge.length} uploaded PDF(s) into single master PDF...`,
+				`[Master PDF Generation] Combining Cadet Application Form + ${attachmentsToMerge.length} uploaded document(s)...`,
 			);
-			const { mergedDataUrl, mergedCount } = await mergeAllPdfs(pdfsToMerge);
+			const { mergedDataUrl, totalPages, attachedCount } = await generateMasterCombinedPdf(
+				formData,
+				generatedRefId,
+				attachmentsToMerge,
+			);
+
+			setMasterPdfUrl(mergedDataUrl);
+			setMasterPdfPageCount(totalPages);
 
 			// Strip redundant individual base64 binaries to optimize network payload size
 			const cleanFormData: Partial<FormData> = { ...formData };
 			delete cleanFormData.marksheetDataUrl;
 			delete cleanFormData.journalFileDataUrl;
-			delete cleanFormData.bookChapterFileDataUrl;
 			delete cleanFormData.patentFileDataUrl;
 			delete cleanFormData.competitionFileDataUrl;
 			delete cleanFormData.activityFileDataUrl;
@@ -852,9 +773,10 @@ export default function Home() {
 				referenceId: generatedRefId,
 				submittedAt: new Date().toISOString(),
 				templateDocId: '1x69S7y0X7UJYR7x2ZEKCoQzPFCb-2nHctp6XNQG3E7I',
-				// Combined master single PDF containing all uploaded proofs & resume
+				// Combined master single PDF containing full application form + all uploaded proofs & resume
 				combinedPdfDataUrl: mergedDataUrl || formData.resumeDataUrl,
-				mergedPdfCount: mergedCount,
+				mergedPdfCount: totalPages,
+				attachedDocumentCount: attachedCount,
 				// Ensure main resumeDataUrl holds the merged master PDF for Drive & Email
 				resumeDataUrl: mergedDataUrl || formData.resumeDataUrl,
 			};
@@ -862,7 +784,10 @@ export default function Home() {
 			const rawDirectUrl =
 				process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL ||
 				'https://script.google.com/macros/s/AKfycbzVklG1gmnnhi1wq6HVMTNr_1XcMADOURNKSJOHFTSDmZzUCPkSQzFWIHslsOIRU3M6/exec';
-			const directGoogleUrl = rawDirectUrl.trim().replace(/^['"]|['"]$/g, '').replace(/^h+ttps:\/\//i, 'https://');
+			const directGoogleUrl = rawDirectUrl
+				.trim()
+				.replace(/^['"]|['"]$/g, '')
+				.replace(/^h+ttps:\/\//i, 'https://');
 
 			try {
 				const res = await fetch('/api/submit', {
@@ -939,43 +864,45 @@ export default function Home() {
 
 			{/* Form Shell / Center Card */}
 			<div className='relative z-10 w-full max-w-4xl mb-16 mt-1 sm:mt-2'>
-				<div className='clean-card overflow-hidden bg-white/95 backdrop-blur-md'>
-					{/* Official Banner Header with Beveled Frame */}
-					<div className='w-full bg-gradient-to-b from-slate-100/90 to-slate-50 border-b border-slate-200/90 p-2.5 sm:p-4 flex justify-center'>
-						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden shadow-xs border border-slate-200/80 bg-white'>
+				<div className='clean-card overflow-hidden'>
+					{/* Top Institutional Accent Line */}
+					<div className='h-1.5 w-full bg-gradient-to-r from-[#0a1e38] via-[#0284c7] to-[#f59e0b]' />
+
+					{/* Official Banner Header with Frame */}
+					<div className='w-full banner-frame-container p-2.5 sm:p-4 flex justify-center'>
+						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden banner-frame-inner'>
 							<Image
-								src='/iic-banner-2026.webp'
+								src='/iic-banner-2026.png'
 								alt='IMU Kolkata Campus - Institution Innovation Council (IIC) 2026-27'
-								width={1024}
-								height={341}
-								unoptimized
+								width={2800}
+								height={600}
 								priority
 								fetchPriority='high'
-								className='w-full h-auto object-contain mx-auto'
-								style={{ imageRendering: '-webkit-optimize-contrast' }}
+								className='w-full h-auto object-contain mx-auto transition-all'
+								sizes='(max-width: 1024px) 100vw, 1024px'
 							/>
 						</div>
 					</div>
 
 					{/* Title & Official Notice Strip */}
-					<div className='px-6 sm:px-9 py-6 sm:py-7 border-b border-slate-100 bg-white'>
+					<div className='px-6 sm:px-9 py-6 sm:py-7 header-strip'>
 						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3.5'>
 							<div>
 								<div className='flex items-center gap-2 mb-1.5 flex-wrap'>
-									<span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs'>
+									<span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold academic-badge shadow-2xs'>
 										Academic Year 2026–27
 									</span>
-									<span className='inline-flex items-center gap-1 text-xs font-bold text-slate-500 uppercase tracking-wider'>
-										<Building2 className='w-3.5 h-3.5 text-slate-400' />
+									<span className='inline-flex items-center gap-1 text-xs font-bold campus-badge uppercase tracking-wider'>
+										<Building2 className='w-3.5 h-3.5 opacity-70' />
 										Indian Maritime University - Kolkata Campus
 									</span>
 								</div>
-								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-black text-[#0e2544] uppercase tracking-tight leading-tight font-heading'>
+								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-black uppercase tracking-tight leading-tight main-title'>
 									Institution’s Innovation Council (IIC) – Cadet Enrollment Form
 								</h1>
 							</div>
 							{draftSaved && (
-								<div className='flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-300 font-bold self-start sm:self-auto shadow-2xs animate-fadeIn'>
+								<div className='flex items-center gap-1.5 text-xs draft-badge px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-2xs animate-fadeIn'>
 									<Check className='w-3.5 h-3.5 text-emerald-600' /> Auto-saved
 								</div>
 							)}
@@ -983,61 +910,61 @@ export default function Home() {
 
 						{/* Instructions to cadets Banner (Visible only before submission) */}
 						{!submitted && (
-							<div className='mt-5 p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-50 via-sky-50/35 to-slate-50 border border-slate-200/90 shadow-2xs'>
-								<div className='flex items-center gap-2.5 pb-3.5 mb-3.5 border-b border-slate-200/70'>
-									<div className='w-7 h-7 rounded-lg bg-[#0e2544] text-white flex items-center justify-center flex-shrink-0 shadow-xs'>
-										<Info className='w-4 h-4 text-sky-300' />
+							<div className='mt-5 p-5 sm:p-6 rounded-2xl notice-card'>
+								<div className='flex items-center gap-2.5 pb-3.5 mb-3.5 border-b border-sky-200/50 dark:border-slate-700/60'>
+									<div className='w-7 h-7 rounded-lg notice-header-badge flex items-center justify-center flex-shrink-0 shadow-xs'>
+										<Info className='w-4 h-4' />
 									</div>
-									<h2 className='font-bold text-[#0e2544] uppercase tracking-wider text-xs sm:text-sm font-heading'>
+									<h2 className='font-bold uppercase tracking-wider text-xs sm:text-sm notice-title'>
 										Important Notice / Instructions:
 									</h2>
 								</div>
-								<ol className='space-y-3 text-slate-700 text-xs sm:text-[13.5px] leading-relaxed'>
+								<ol className='space-y-3 text-xs sm:text-[13.5px] leading-relaxed'>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
 											1
 										</span>
-										<span className='flex-1 font-medium'>
+										<span className='flex-1 font-medium notice-step-text'>
 											Fields marked with an asterisk (
-											<span className='text-rose-600 font-extrabold'>*</span>) are mandatory and must
-											be completed.
+											<span className='text-rose-500 font-extrabold'>*</span>) are mandatory and
+											must be completed.
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
 											2
 										</span>
-										<span className='flex-1 font-medium'>
+										<span className='flex-1 font-medium notice-step-text'>
 											Cadets are advised to ensure that all information provided is accurate,
 											complete, and supported by valid documents before submission.
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
 											3
 										</span>
-										<span className='flex-1 font-medium'>
+										<span className='flex-1 font-medium notice-step-text'>
 											The Enrollment Form and all supporting documents/proofs submitted will be
 											compiled into a single PDF and sent to the registered email ID.
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
 											4
 										</span>
-										<span className='flex-1 font-medium'>
+										<span className='flex-1 font-medium notice-step-text'>
 											Cadets are required to verify all their details and entries made in the PDF
 											received through their registered email ID.
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full bg-[#0e2544]/10 text-[#0e2544] text-[11px] font-extrabold flex items-center justify-center mt-0.5 border border-[#0e2544]/20'>
+										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
 											5
 										</span>
-										<span className='flex-1 font-medium'>
+										<span className='flex-1 font-medium notice-step-text'>
 											After verification, sign in the space provided and self-attest the
-											PDF/documents, and submit the duly verified documents in person to the concerned
-											Faculty In-charge.
+											PDF/documents, and submit the duly verified documents in person to the
+											concerned Faculty In-charge.
 										</span>
 									</li>
 								</ol>
@@ -1158,15 +1085,7 @@ export default function Home() {
 											<div className='flex items-center gap-2 text-slate-700'>
 												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
 												<span>
-													<strong>Journal Proof:</strong> {formData.journalFileName}
-												</span>
-											</div>
-										)}
-										{formData.hasBookChapter && formData.bookChapterFileName && (
-											<div className='flex items-center gap-2 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-												<span>
-													<strong>Book Chapter Proof:</strong> {formData.bookChapterFileName}
+													<strong>Journal / Book Chapter Proof:</strong> {formData.journalFileName}
 												</span>
 											</div>
 										)}
@@ -1222,56 +1141,91 @@ export default function Home() {
 										</div>
 									</div>
 								)}
+
+								{/* Master Combined PDF Download & Status */}
+								{masterPdfUrl && (
+									<div className='pt-3.5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+										<div className='flex items-center gap-2'>
+											<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
+											<span className='font-bold text-slate-800 text-xs sm:text-sm'>
+												Master Merged PDF ({masterPdfPageCount} Pages Generated)
+											</span>
+										</div>
+										<a
+											href={masterPdfUrl}
+											download={`IIC_Enrollment_${formData.regNumber || 'Cadet'}_Master.pdf`}
+											className='btn-primary py-2 px-4 text-xs inline-flex items-center justify-center gap-1.5 shadow-sm bg-gradient-to-r from-[#0e2544] to-[#163866] hover:from-[#163866] hover:to-[#0e2544]'>
+											<FileCheck className='w-3.5 h-3.5 text-sky-300' /> Download Master PDF
+										</a>
+									</div>
+								)}
 							</div>
 						</div>
 					) : (
 						/* MAIN ENROLLMENT FORM */
 						<form onSubmit={handleSubmit} noValidate className='bg-white'>
-							{/* 5-STEP RESPONSIVE TAB BAR (VISIBLE ON ALL SCREENS WITHOUT SCROLLING) */}
-							<div className='border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-sky-50/20 to-slate-50 px-2 sm:px-6 py-3 sm:py-4'>
-								<div className='grid grid-cols-5 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto w-full'>
+							{/* 5-STEP RESPONSIVE ACCESSIBLE STEPPER (W3C & 21st.dev Standard) */}
+							<nav
+								aria-label='Cadet Enrollment Steps'
+								className='border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-sky-50/20 to-slate-50 px-2 sm:px-6 pt-3.5 pb-3 sm:pt-4 sm:pb-3.5'>
+								{/* Top Stepper Track Progress Bar */}
+								<div className='w-full max-w-4xl mx-auto mb-3 px-0.5 sm:px-1'>
+									<div className='h-1 w-full bg-slate-200/80 rounded-full overflow-hidden'>
+										<div
+											className='h-full bg-gradient-to-r from-[#0e2544] via-[#0284c7] to-emerald-500 transition-all duration-300 ease-out'
+											style={{ width: `${Math.max(12, ((currentStep - 1) / 4) * 100)}%` }}
+										/>
+									</div>
+								</div>
+
+								<ol
+									role='list'
+									className='grid grid-cols-5 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto w-full'>
 									{SECTIONS.map((sec) => {
 										const isCurrent = currentStep === sec.id;
 										const isCompleted = completedSteps.includes(sec.id) && !isCurrent;
 
 										return (
-											<button
-												key={sec.id}
-												type='button'
-												onClick={() => handleStepClick(sec.id)}
-												title={
-													isCurrent
-														? `Current Section: ${sec.title}`
-														: isCompleted
-															? `${sec.title} (Completed)`
-															: `${sec.title}`
-												}
-												className={`group relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-													isCurrent
-														? 'bg-gradient-to-r from-[#0e2544] to-[#163866] text-white shadow-md ring-2 ring-sky-400/40 scale-[1.02]'
-														: isCompleted
-															? 'bg-emerald-50 text-emerald-950 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
-															: 'bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
-												}`}>
-												<div
-													className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 transition-transform ${
+											<li key={sec.id} className='list-none'>
+												<button
+													type='button'
+													onClick={() => handleStepClick(sec.id)}
+													aria-current={isCurrent ? 'step' : undefined}
+													aria-label={`Step ${sec.id}: ${sec.title} (${isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Pending'})`}
+													title={
 														isCurrent
-															? 'bg-sky-400 text-[#0e2544] shadow-xs'
+															? `Current Section: ${sec.title}`
 															: isCompleted
-																? 'bg-emerald-600 text-white'
-																: 'bg-slate-200 text-slate-600'
+																? `${sec.title} (Completed)`
+																: `${sec.title}`
+													}
+													className={`group relative w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:outline-none ${
+														isCurrent
+															? 'bg-gradient-to-r from-[#0e2544] to-[#163866] text-white shadow-md ring-2 ring-sky-400/40 scale-[1.02]'
+															: isCompleted
+																? 'bg-emerald-50 text-emerald-950 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+																: 'bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
 													}`}>
-													{isCompleted ? <Check className='w-3 h-3 stroke-[2.5]' /> : sec.id}
-												</div>
+													<div
+														className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 transition-transform ${
+															isCurrent
+																? 'bg-sky-400 text-[#0e2544] shadow-xs'
+																: isCompleted
+																	? 'bg-emerald-600 text-white'
+																	: 'bg-slate-200 text-slate-600'
+														}`}>
+														{isCompleted ? <Check className='w-3 h-3 stroke-[2.5]' /> : sec.id}
+													</div>
 
-												<span className='truncate text-[10px] sm:text-xs tracking-tight text-center font-semibold sm:font-bold'>
-													<span className='sm:hidden'>{sec.shortTitle}</span>
-													<span className='hidden sm:inline'>{sec.title}</span>
-												</span>
-											</button>
+													<span className='truncate text-[10px] sm:text-xs tracking-tight text-center font-semibold sm:font-bold'>
+														<span className='sm:hidden'>{sec.shortTitle}</span>
+														<span className='hidden sm:inline'>{sec.title}</span>
+													</span>
+												</button>
+											</li>
 										);
 									})}
-								</div>
+								</ol>
 
 								{/* Progress Completion Indicator */}
 								<div className='flex items-center justify-between text-[11px] text-slate-500 font-semibold mt-2.5 px-1 max-w-4xl mx-auto'>
@@ -1283,7 +1237,7 @@ export default function Home() {
 										{progressPercent}% Complete ({completedCount}/5 Steps Completed)
 									</span>
 								</div>
-							</div>
+							</nav>
 
 							{/* FORM BODY CONTAINER */}
 							<div className='p-6 sm:p-9 lg:p-10 space-y-8'>
@@ -1614,7 +1568,7 @@ export default function Home() {
 													Academic & Research Profile
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 8 to 12 • CGPA, Publications, IPR & Competitions
+													Questions 8 to 11 • CGPA, Publications, IPR & Competitions
 												</p>
 											</div>
 										</div>
@@ -1622,8 +1576,8 @@ export default function Home() {
 									</div>
 
 									{/* Question 8: Current CGPA */}
-									<div id='cgpa' className='section-container'>
-										<div className='flex items-baseline justify-between mb-2.5 flex-wrap gap-2'>
+									<div id='cgpa' className='section-container space-y-3'>
+										<div className='flex items-baseline justify-between mb-1 flex-wrap gap-2'>
 											<label
 												htmlFor='cgpaInput'
 												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
@@ -1664,28 +1618,21 @@ export default function Home() {
 													</p>
 												)}
 											</div>
-											<div className='text-xs text-slate-700 bg-amber-50 border border-amber-200/90 p-3.5 rounded-xl leading-relaxed'>
-												<span className='font-bold text-amber-900 block mb-0.5'>
-													Note:- Not applicable for first semester cadets.
-												</span>
-											</div>
 										</div>
 									</div>
 
-									{/* Question 9: Journal Publications */}
+									{/* Question 9: Journal / Book Chapter Publications */}
 									<div className='section-container space-y-4'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
 													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														9. Journal Publications, if any
+														9. Journal / Book Chapter Publications, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
-														Note:- Not applicable for first semester cadets.
-													</span>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
-													Mention publication details & upload authorship proof PDF (if selected).
+													Mention paper / book chapter details & upload publication proof PDF (if
+													selected).
 												</span>
 											</div>
 											{/* N/A Toggle */}
@@ -1726,7 +1673,7 @@ export default function Home() {
 											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
 													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
-														Paper Title & Publication Details{' '}
+														Paper / Book Chapter Publication Details{' '}
 														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
@@ -1734,7 +1681,7 @@ export default function Home() {
 														rows={2}
 														value={formData.journalDetails}
 														onChange={handleChange}
-														placeholder='Paper Title, Journal Name, ISSN / DOI, Volume/Issue, Year...'
+														placeholder='Paper / Book Chapter Title, Journal / Book Name, Publisher / Conference, ISSN / ISBN / DOI, Volume, Year...'
 														className={`form-input resize-none ${errors.journalDetails && touched.journalDetails ? 'input-error' : ''}`}
 													/>
 													{errors.journalDetails && touched.journalDetails && (
@@ -1771,7 +1718,7 @@ export default function Home() {
 															</span>
 														) : (
 															<span className='text-slate-500 font-medium'>
-																Upload paper first page PDF{' '}
+																Upload publication / chapter proof PDF{' '}
 																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
@@ -1800,151 +1747,14 @@ export default function Home() {
 										)}
 									</div>
 
-									{/* Question 10: Book Chapter Publications */}
+									{/* Question 10: Patents / Design Registrations / Copyrights */}
 									<div className='section-container space-y-4'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
 													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														10. Book Chapter Publications, if any
+														10. Patents / Design Registrations / Copyrights, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
-														Note:- Not applicable for first semester cadets.
-													</span>
-												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
-													Mention publication details & upload book chapter proof PDF (if selected).
-												</span>
-											</div>
-											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
-												<button
-													type='button'
-													onClick={() => {
-														setFormData((prev) => ({
-															...prev,
-															hasBookChapter: false,
-															bookChapterDetails: '',
-															bookChapterFileName: '',
-															bookChapterFileDataUrl: '',
-														}));
-														setErrors((prev) => ({
-															...prev,
-															bookChapterDetails: '',
-															bookChapterFile: '',
-														}));
-													}}
-													className={`na-toggle-btn ${
-														!formData.hasBookChapter
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
-													}`}>
-													NIL
-												</button>
-												<button
-													type='button'
-													onClick={() => setFormData((prev) => ({ ...prev, hasBookChapter: true }))}
-													className={`na-toggle-btn ${
-														formData.hasBookChapter
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
-													}`}>
-													+ I Have Chapters
-												</button>
-											</div>
-										</div>
-
-										{formData.hasBookChapter && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
-												<div>
-													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
-														Book & Chapter Details <span className='text-red-600 font-bold'>*</span>
-													</label>
-													<textarea
-														name='bookChapterDetails'
-														rows={2}
-														value={formData.bookChapterDetails}
-														onChange={handleChange}
-														placeholder='Book Title, Chapter Title, ISBN, Publisher, Year...'
-														className={`form-input resize-none ${errors.bookChapterDetails && touched.bookChapterDetails ? 'input-error' : ''}`}
-													/>
-													{errors.bookChapterDetails && touched.bookChapterDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
-															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
-															{errors.bookChapterDetails}
-														</p>
-													)}
-												</div>
-
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
-														<Upload className='w-4 h-4 text-sky-700' />
-														<span>
-															{formData.bookChapterFileName ? 'Change PDF' : 'Upload PDF'}
-														</span>
-														<input
-															type='file'
-															accept='.pdf,application/pdf'
-															onChange={(e) =>
-																handlePdfChange(
-																	e,
-																	'bookChapterFileName',
-																	'bookChapterFileDataUrl',
-																	'bookChapterFile',
-																)
-															}
-															className='sr-only'
-														/>
-													</label>
-													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
-														{formData.bookChapterFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
-																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
-																{formData.bookChapterFileName}
-															</span>
-														) : (
-															<span className='text-slate-500 font-medium'>
-																Upload book chapter PDF{' '}
-																<span className='text-red-600 font-bold'>*</span>
-															</span>
-														)}
-													</span>
-													{formData.bookChapterFileName && (
-														<button
-															type='button'
-															onClick={() =>
-																setFormData((prev) => ({
-																	...prev,
-																	bookChapterFileName: '',
-																	bookChapterFileDataUrl: '',
-																}))
-															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
-															<Trash2 className='w-4 h-4' />
-														</button>
-													)}
-												</div>
-												{errors.bookChapterFile && touched.bookChapterFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
-														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
-														{errors.bookChapterFile}
-													</p>
-												)}
-											</div>
-										)}
-									</div>
-
-									{/* Question 11: Patents / Design Registrations / Copyrights */}
-									<div className='section-container space-y-4'>
-										<div className='flex items-center justify-between flex-wrap gap-3'>
-											<div>
-												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														11. Patents / Design Registrations / Copyrights, if any
-													</label>
-													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
-														Note:- Not applicable for first semester cadets.
-													</span>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
 													Mention IPR details & upload certificate / filing document in PDF (if
@@ -2062,17 +1872,14 @@ export default function Home() {
 										)}
 									</div>
 
-									{/* Question 12: Participation in Competitions / Hackathons */}
+									{/* Question 11: Participation in Competitions / Hackathons */}
 									<div className='section-container space-y-4'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
 													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														12. Competitions / Hackathons / Technothons, if any
+														11. Competitions / Hackathons / Technothons, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2.5 py-0.5 rounded-full'>
-														Note:- Not applicable for first semester cadets.
-													</span>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
 													Mention event & achievement, and upload certificate in PDF (if selected).
@@ -2201,46 +2008,43 @@ export default function Home() {
 								</section>
 
 								{/* ======================================================== */}
-								{/* SECTION 3: CO-CURRICULAR & LEADERSHIP PROFILE (Q13 - Q15) */}
+								{/* SECTION 3: CO-CURRICULAR & LEADERSHIP PROFILE (Q12 - Q14) */}
 								{/* ======================================================== */}
 								<section
 									id='section-3'
-									className={`space-y-6 ${currentStep === 3 ? 'block animate-fadeIn' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
-										<div className='flex items-center gap-2.5'>
+									className={`space-y-6 sm:space-y-7 ${currentStep === 3 ? 'block animate-fadeIn' : 'hidden'}`}>
+									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
+										<div className='flex items-center gap-3'>
 											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
 												<Award className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Co-Curricular & Leadership Profile
 												</h2>
-												<p className='text-xs text-slate-500 font-medium'>
-													Questions 13 to 15 • Activities, Awards & Leadership Positions
+												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
+													Questions 12 to 14 • Activities, Awards & Leadership Positions
 												</p>
 											</div>
 										</div>
 										<span className='section-badge'>Section 3 of 5</span>
 									</div>
 
-									{/* Question 13: Technical / Co-Curricular Activities */}
-									<div className='section-container space-y-3'>
-										<div className='flex items-center justify-between flex-wrap gap-2'>
+									{/* Question 12: Technical / Co-Curricular Activities */}
+									<div className='section-container space-y-4'>
+										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
-														13. Technical / Co-Curricular Activities, if any
+													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+														12. Technical / Co-Curricular Activities, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-full'>
-														Note:- Not applicable for first semester cadets.
-													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-0.5'>
+												<span className='text-xs text-slate-500 block mt-1'>
 													Mention the activity, event, and your role, and upload certificate in PDF
 													(if selected).
 												</span>
 											</div>
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
 												<button
 													type='button'
 													onClick={() => {
@@ -2278,9 +2082,9 @@ export default function Home() {
 										</div>
 
 										{formData.hasActivities && (
-											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
-													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
 														Activity & Contribution Details{' '}
 														<span className='text-red-600 font-bold'>*</span>
 													</label>
@@ -2293,15 +2097,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.activityDetails && touched.activityDetails ? 'input-error' : ''}`}
 													/>
 													{errors.activityDetails && touched.activityDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1 animate-fadeIn'>
-															<AlertCircle className='w-3.5 h-3.5' /> {errors.activityDetails}
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.activityDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs hover:border-slate-400'>
-														<Upload className='w-3.5 h-3.5 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
+														<Upload className='w-4 h-4 text-sky-700' />
 														<span>{formData.activityFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -2319,12 +2124,12 @@ export default function Home() {
 													</label>
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.activityFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4 text-emerald-600' />{' '}
+															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
+																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
 																{formData.activityFileName}
 															</span>
 														) : (
-															<span className='text-slate-500'>
+															<span className='text-slate-500 font-medium'>
 																Upload certificate PDF{' '}
 																<span className='text-red-600 font-bold'>*</span>
 															</span>
@@ -2340,37 +2145,34 @@ export default function Home() {
 																	activityFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1'>
+															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.activityFile && touched.activityFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1 animate-fadeIn'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.activityFile}
+													<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.activityFile}
 													</p>
 												)}
 											</div>
 										)}
 									</div>
 
-									{/* Question 14: Major Achievements / Awards */}
-									<div className='section-container space-y-3'>
-										<div className='flex items-center justify-between flex-wrap gap-2'>
+									{/* Question 13: Major Achievements / Awards */}
+									<div className='section-container space-y-4'>
+										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
-														14. Major Achievements / Awards, if any
+													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+														13. Major Achievements / Awards, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-full'>
-														Note:- Not applicable for first semester cadets.
-													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-0.5'>
+												<span className='text-xs text-slate-500 block mt-1'>
 													Mention the achievement & upload certificate / proof in PDF (if selected).
 												</span>
 											</div>
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
 												<button
 													type='button'
 													onClick={() => {
@@ -2410,9 +2212,9 @@ export default function Home() {
 										</div>
 
 										{formData.hasAchievements && (
-											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
-													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
 														Achievement & Award Details{' '}
 														<span className='text-red-600 font-bold'>*</span>
 													</label>
@@ -2425,15 +2227,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.achievementDetails && touched.achievementDetails ? 'input-error' : ''}`}
 													/>
 													{errors.achievementDetails && touched.achievementDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1 animate-fadeIn'>
-															<AlertCircle className='w-3.5 h-3.5' /> {errors.achievementDetails}
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.achievementDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-													<label className='inline-flex items-center gap-2 px-3.5 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-xs hover:border-slate-400'>
-														<Upload className='w-3.5 h-3.5 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
+													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
+														<Upload className='w-4 h-4 text-sky-700' />
 														<span>
 															{formData.achievementFileName ? 'Change PDF' : 'Upload PDF'}
 														</span>
@@ -2453,12 +2256,12 @@ export default function Home() {
 													</label>
 													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
 														{formData.achievementFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1'>
-																<FileCheck className='w-4 h-4 text-emerald-600' />{' '}
+															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
+																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
 																{formData.achievementFileName}
 															</span>
 														) : (
-															<span className='text-slate-500'>
+															<span className='text-slate-500 font-medium'>
 																Upload award proof PDF{' '}
 																<span className='text-red-600 font-bold'>*</span>
 															</span>
@@ -2474,38 +2277,36 @@ export default function Home() {
 																	achievementFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1'>
+															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.achievementFile && touched.achievementFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1 animate-fadeIn'>
-														<AlertCircle className='w-3.5 h-3.5' /> {errors.achievementFile}
+													<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+														{errors.achievementFile}
 													</p>
 												)}
 											</div>
 										)}
 									</div>
 
-									{/* Question 15: Leadership / Coordinator Positions Held */}
-									<div className='section-container space-y-3'>
-										<div className='flex items-center justify-between flex-wrap gap-2'>
+									{/* Question 14: Leadership / Coordinator Positions Held */}
+									<div className='section-container space-y-4'>
+										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544]'>
-														15. Leadership / Coordinator Positions Held, if any
+													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+														14. Leadership / Coordinator Positions Held, if any
 													</label>
-													<span className='text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-full'>
-														Note:- Not applicable for first semester cadets.
-													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-0.5'>
+												<span className='text-xs text-slate-500 block mt-1'>
 													Mention position, organisation/club/event, duration, and responsibilities
 													held.
 												</span>
 											</div>
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
 												<button
 													type='button'
 													onClick={() => {
@@ -2539,9 +2340,9 @@ export default function Home() {
 										</div>
 
 										{formData.hasLeadership && (
-											<div className='pt-3 space-y-3 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
-													<label className='block text-xs font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
+													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
 														Leadership Role Details{' '}
 														<span className='text-red-600 font-bold'>*</span>
 													</label>
@@ -2554,8 +2355,9 @@ export default function Home() {
 														className={`form-input resize-none ${errors.leadershipDetails && touched.leadershipDetails ? 'input-error' : ''}`}
 													/>
 													{errors.leadershipDetails && touched.leadershipDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1 animate-fadeIn'>
-															<AlertCircle className='w-3.5 h-3.5' /> {errors.leadershipDetails}
+														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.leadershipDetails}
 														</p>
 													)}
 												</div>
@@ -2565,39 +2367,41 @@ export default function Home() {
 								</section>
 
 								{/* ======================================================== */}
-								{/* SECTION 4: INNOVATION & PROBLEM-SOLVING (Q16 - Q18) */}
+								{/* SECTION 4: INNOVATION & PROBLEM-SOLVING (Q15 - Q17) */}
 								{/* ======================================================== */}
 								<section
 									id='section-4'
-									className={`space-y-6 ${currentStep === 4 ? 'block animate-fadeIn' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-3'>
-										<div className='flex items-center gap-2.5'>
+									className={`space-y-6 sm:space-y-7 ${currentStep === 4 ? 'block animate-fadeIn' : 'hidden'}`}>
+									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
+										<div className='flex items-center gap-3'>
 											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
 												<Lightbulb className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-base sm:text-lg font-bold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
 													Innovation & Problem-Solving
 												</h2>
-												<p className='text-xs text-slate-500 font-medium'>
-													Questions 16 to 18 • Vision, Ecosystem Challenges & Technology Interests
+												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
+													Questions 15 to 17 • Vision, Ecosystem Challenges & Technology Interests
 												</p>
 											</div>
 										</div>
 										<span className='section-badge'>Section 4 of 5</span>
 									</div>
 
-									{/* Question 16: Maritime / University Ecosystem Problem */}
-									<div id='problemMaritime' className='section-container space-y-2'>
-										<label
-											htmlFor='problemMaritimeInput'
-											className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-											16. Problem in the Indian Maritime University Ecosystem you would like to
-											solve <span className='text-red-600 font-bold'>*</span>
-										</label>
-										<p className='text-xs text-slate-600 leading-relaxed'>
-											Briefly describe the problem and why you think it needs to be addressed.
-										</p>
+									{/* Question 15: Maritime / University Ecosystem Problem */}
+									<div id='problemMaritime' className='section-container space-y-3'>
+										<div>
+											<label
+												htmlFor='problemMaritimeInput'
+												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+												15. What Problem in the Indian Maritime University Ecosystem you would like
+												to solve? <span className='text-red-600 font-bold'>*</span>
+											</label>
+											<p className='text-xs text-slate-500 leading-relaxed block mt-1'>
+												Briefly describe the problem and why you think it needs to be addressed.
+											</p>
+										</div>
 										<textarea
 											id='problemMaritimeInput'
 											name='problemMaritime'
@@ -2618,17 +2422,19 @@ export default function Home() {
 										</div>
 									</div>
 
-									{/* Question 17: Problem in Society */}
-									<div id='problemSociety' className='section-container space-y-2'>
-										<label
-											htmlFor='problemSocietyInput'
-											className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-											17. Problem in Society you would like to solve{' '}
-											<span className='text-red-600 font-bold'>*</span>
-										</label>
-										<p className='text-xs text-slate-600 leading-relaxed'>
-											Briefly describe the problem and why you think it needs to be addressed.
-										</p>
+									{/* Question 16: Problem in Society */}
+									<div id='problemSociety' className='section-container space-y-3'>
+										<div>
+											<label
+												htmlFor='problemSocietyInput'
+												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+												16. What Problem in Society you would like to solve?
+												<span className='text-red-600 font-bold'>*</span>
+											</label>
+											<p className='text-xs text-slate-500 leading-relaxed block mt-1'>
+												Briefly describe the problem and why you think it needs to be addressed.
+											</p>
+										</div>
 										<textarea
 											id='problemSocietyInput'
 											name='problemSociety'
@@ -2649,20 +2455,20 @@ export default function Home() {
 										</div>
 									</div>
 
-									{/* Question 18: Area(s) of Innovation / Technology Interest */}
-									<div id='areasOfInterest' className='section-container space-y-3.5'>
+									{/* Question 17: Area(s) of Innovation / Technology Interest */}
+									<div id='areasOfInterest' className='section-container space-y-4'>
 										<div>
-											<label className='text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0e2544] block'>
-												18. Which area(s) of innovation / technology interest you most?{' '}
+											<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+												17. Which area(s) of innovation / technology interest you most?{' '}
 												<span className='text-red-600 font-bold'>*</span>
 											</label>
-											<p className='text-xs text-slate-600 mt-0.5'>
+											<p className='text-xs text-slate-500 mt-1 block'>
 												Select at least 1 innovation domain from below or add custom areas.
 											</p>
 										</div>
 
 										{/* Interactive Tag Chips */}
-										<div className='flex flex-wrap gap-2 pt-1'>
+										<div className='flex flex-wrap gap-2.5 pt-1'>
 											{SUGGESTED_INTERESTS.map((tag) => {
 												const active = formData.areasOfInterest.includes(tag);
 												return (
@@ -2683,7 +2489,7 @@ export default function Home() {
 										</div>
 
 										{/* Add Custom Tag */}
-										<div className='flex gap-2 pt-2'>
+										<div className='flex gap-2.5 pt-2'>
 											<input
 												type='text'
 												value={formData.customInterest}
@@ -2723,7 +2529,7 @@ export default function Home() {
 								</section>
 
 								{/* ======================================================== */}
-								{/* SECTION 5: SUPPORTING DOCUMENTS & DECLARATION (Q19 - Q20) */}
+								{/* SECTION 5: SUPPORTING DOCUMENTS & DECLARATION (Q18 - Q19) */}
 								{/* ======================================================== */}
 								<section
 									id='section-5'
@@ -2738,14 +2544,14 @@ export default function Home() {
 													Supporting Documents & Official Declaration
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 19 & 20 • Resume / CV, Master PDF & Official Student Declaration
+													Questions 18 & 19 • Resume / CV, Master PDF & Official Student Declaration
 												</p>
 											</div>
 										</div>
 										<span className='section-badge'>Section 5 of 5</span>
 									</div>
 
-									{/* Question 19: Upload Detailed Resume / CV (Optional / Recommended with 2 Tabs) */}
+									{/* Question 18: Upload Detailed Resume / CV (Optional / Recommended with 2 Tabs) */}
 									<div id='resume' className='section-container space-y-4'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
@@ -2753,7 +2559,7 @@ export default function Home() {
 													<label
 														htmlFor='resumeInput'
 														className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														19. Upload Detailed Resume / CV (PDF)
+														18. Upload Detailed Resume / CV (PDF)
 													</label>
 													<span className='text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded-full'>
 														Recommended
@@ -2868,10 +2674,10 @@ export default function Home() {
 										)}
 									</div>
 
-									{/* Question 20: Student Declaration */}
+									{/* Question 19: Student Declaration */}
 									<div id='declarationAccepted' className='section-container space-y-5'>
 										<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
-											20. Student Declaration / Consent for Participation in IIC Activities{' '}
+											19. Student Declaration / Consent for Participation in IIC Activities{' '}
 											<span className='text-red-600 font-bold'>*</span>
 										</label>
 

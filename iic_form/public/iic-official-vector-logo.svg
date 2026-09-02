@@ -1,0 +1,37 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
+  <defs>
+    <style>
+      .txt-main { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: 900; fill: #0B2545; letter-spacing: -0.5px; }
+      .txt-sub { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: 700; fill: #D8232A; letter-spacing: 0.2px; }
+    </style>
+  </defs>
+
+  <!-- Left Icon Emblem Group -->
+  <g transform="translate(10, 15)">
+    <!-- Yellow / Orange Head (Left) -->
+    <circle cx="52" cy="46" r="28" fill="#F58220" />
+
+    <!-- Deep Blue Head (Right) -->
+    <circle cx="168" cy="46" r="28" fill="#0B2545" />
+
+    <!-- Orange Body / Arms Curve -->
+    <path d="M 52,78 C 50,115 75,145 105,170 C 135,195 185,230 185,268 C 158,252 145,215 125,188 C 95,148 70,115 52,78 Z" fill="#F58220" />
+    <path d="M 52,78 C 82,108 122,142 162,170 C 185,186 200,212 195,248 C 180,210 155,182 128,155 C 98,125 72,98 52,78 Z" fill="#F58220" />
+
+    <!-- Blue Interlocking Ribbon Body -->
+    <path d="M 168,78 C 170,115 145,145 115,170 C 85,195 35,230 35,268 C 62,252 75,215 95,188 C 125,148 150,115 168,78 Z" fill="#0B2545" />
+    <path d="M 168,78 C 138,108 98,142 58,170 C 35,186 20,212 25,248 C 40,210 65,182 92,155 C 122,125 148,98 168,78 Z" fill="#0B2545" />
+
+    <!-- Red Bottom Left Swoosh Motif -->
+    <path d="M 25,248 C 20,212 35,186 58,170 C 45,195 40,225 55,255 C 65,275 80,285 98,290 C 65,290 38,272 25,248 Z" fill="#D8232A" />
+  </g>
+
+  <!-- Typography Right Column -->
+  <g transform="translate(235, 40)">
+    <text x="0" y="52" font-size="54" class="txt-main">INSTITUTION'S</text>
+    <text x="0" y="112" font-size="54" class="txt-main">INNOVATION</text>
+    <text x="0" y="172" font-size="54" class="txt-main">COUNCIL</text>
+    <text x="0" y="218" font-size="25" class="txt-sub">(Ministry of Education Initiative)</text>
+  </g>
+</svg>
