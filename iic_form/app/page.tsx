@@ -3,7 +3,6 @@
 import React, { useState, useEffect, FormEvent, ChangeEvent, FocusEvent } from 'react';
 import Image from 'next/image';
 import confetti from 'canvas-confetti';
-import { generateMasterCombinedPdf } from './lib/generateMasterPdf';
 import {
 	User,
 	GraduationCap,
@@ -22,8 +21,6 @@ import {
 	Plus,
 	Check,
 	RotateCcw,
-	Copy,
-	CheckCheck,
 	Mail,
 	Phone,
 	Hash,
@@ -156,11 +153,15 @@ const INITIAL_STATE: FormData = {
 };
 
 const DEPARTMENTS = [
-	'B.Tech Marine Engineering',
+	'B.Tech Marine Engineering (BME)',
 	'MBA (International Transportation & Logistics Management)',
+	'M.Tech Marine Technology (MMT)',
 ];
 
-const SEMESTERS = [
+const ALL_YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+const PG_YEARS = ['1st Year', '2nd Year'];
+
+const ALL_SEMESTERS = [
 	'Semester 1',
 	'Semester 2',
 	'Semester 3',
@@ -170,6 +171,7 @@ const SEMESTERS = [
 	'Semester 7',
 	'Semester 8',
 ];
+const PG_SEMESTERS = ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4'];
 
 const SUGGESTED_INTERESTS = [
 	'🚢 Maritime Robotics, USVs & Autonomous Vessels',
@@ -188,7 +190,13 @@ const SUGGESTED_INTERESTS = [
 
 const SECTIONS = [
 	{ id: 1, title: 'Cadet Profile', shortTitle: 'Profile', icon: User, badge: 'Q1–Q7' },
-	{ id: 2, title: 'Academic & Research', shortTitle: 'Academic', icon: GraduationCap, badge: 'Q8–Q11' },
+	{
+		id: 2,
+		title: 'Academic & Research',
+		shortTitle: 'Academic',
+		icon: GraduationCap,
+		badge: 'Q8–Q11',
+	},
 	{ id: 3, title: 'Co-Curricular', shortTitle: 'Activities', icon: Award, badge: 'Q12–Q14' },
 	{ id: 4, title: 'Innovation', shortTitle: 'Innovation', icon: Lightbulb, badge: 'Q15–Q17' },
 	{ id: 5, title: 'Declaration', shortTitle: 'Declaration', icon: ShieldCheck, badge: 'Q18–Q19' },
@@ -204,11 +212,12 @@ export default function Home() {
 	const [submitting, setSubmitting] = useState(false);
 	const [submittedRefId, setSubmittedRefId] = useState('');
 	const [draftSaved, setDraftSaved] = useState(false);
-	const [copiedRefId, setCopiedRefId] = useState(false);
-	const [masterPdfUrl, setMasterPdfUrl] = useState<string>('');
-	const [masterPdfPageCount, setMasterPdfPageCount] = useState<number>(0);
 
-	const isFirstYear = formData.yearOfStudy === '1st Year';
+	const isFirstYear = formData.yearOfStudy === '1st Year' || formData.semester === 'Semester 1';
+	const isPostGraduate =
+		formData.department.includes('MBA') || formData.department.includes('M.Tech');
+	const availableYears = isPostGraduate ? PG_YEARS : ALL_YEARS;
+	const availableSemesters = isPostGraduate ? PG_SEMESTERS : ALL_SEMESTERS;
 
 	// Load draft from localStorage on mount
 	useEffect(() => {
@@ -353,6 +362,32 @@ export default function Home() {
 			value = value.toUpperCase();
 		}
 
+		if (name === 'department') {
+			const isPG = value.includes('MBA') || value.includes('M.Tech');
+			setFormData((prev) => {
+				let updatedYear = prev.yearOfStudy;
+				let updatedSem = prev.semester;
+
+				if (isPG) {
+					if (updatedYear === '3rd Year' || updatedYear === '4th Year') {
+						updatedYear = '2nd Year';
+					}
+					const semNum = parseInt(updatedSem.replace(/\D/g, ''), 10) || 1;
+					if (semNum > 4) {
+						updatedSem = 'Semester 4';
+					}
+				}
+
+				return {
+					...prev,
+					department: value,
+					yearOfStudy: updatedYear,
+					semester: updatedSem,
+				};
+			});
+			return;
+		}
+
 		setFormData((prev) => ({ ...prev, [name]: value }));
 
 		if (touched[name]) {
@@ -365,12 +400,14 @@ export default function Home() {
 		e: FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
 	) => {
 		const { name, value } = e.target;
-		setTouched((prev) => ({ ...prev, [name]: true }));
-		const error = validateField(name, value);
-		setErrors((prev) => ({ ...prev, [name]: error }));
+		if (touched[name] || (value && value.trim().length > 0)) {
+			setTouched((prev) => ({ ...prev, [name]: true }));
+			const error = validateField(name, value);
+			setErrors((prev) => ({ ...prev, [name]: error }));
+		}
 	};
 
-	// Passport photo change with automatic image resizing (max 10MB)
+	// Passport photo change with automatic image resizing (max 5MB)
 	const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
 		if (file) {
@@ -381,8 +418,8 @@ export default function Home() {
 				}));
 				return;
 			}
-			if (file.size > 10 * 1024 * 1024) {
-				setErrors((prev) => ({ ...prev, photo: 'Image size must be under 10MB.' }));
+			if (file.size > 5 * 1024 * 1024) {
+				setErrors((prev) => ({ ...prev, photo: 'Image size must be under 5MB.' }));
 				return;
 			}
 
@@ -490,15 +527,6 @@ export default function Home() {
 				}));
 				setErrors((e) => ({ ...e, areasOfInterest: '' }));
 			}
-		}
-	};
-
-	// Copy Reference ID
-	const handleCopyRefId = () => {
-		if (submittedRefId && typeof navigator !== 'undefined' && navigator.clipboard) {
-			navigator.clipboard.writeText(submittedRefId);
-			setCopiedRefId(true);
-			setTimeout(() => setCopiedRefId(false), 2500);
 		}
 	};
 
@@ -671,6 +699,9 @@ export default function Home() {
 	};
 
 	const handleStepClick = (targetStep: number) => {
+		if (isStepComplete(currentStep)) {
+			setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
+		}
 		setCurrentStep(targetStep);
 		if (typeof window !== 'undefined') {
 			window.scrollTo({ top: 320, behavior: 'smooth' });
@@ -678,13 +709,13 @@ export default function Home() {
 	};
 
 	const nextStep = () => {
-		if (validateStep(currentStep)) {
+		if (isStepComplete(currentStep)) {
 			setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
-			if (currentStep < 5) {
-				setCurrentStep((prev) => prev + 1);
-				if (typeof window !== 'undefined') {
-					window.scrollTo({ top: 320, behavior: 'smooth' });
-				}
+		}
+		if (currentStep < 5) {
+			setCurrentStep((prev) => prev + 1);
+			if (typeof window !== 'undefined') {
+				window.scrollTo({ top: 320, behavior: 'smooth' });
 			}
 		}
 	};
@@ -735,50 +766,11 @@ export default function Home() {
 			const generatedRefId = `IIC-2627-${Math.floor(1000 + Math.random() * 9000)}`;
 			setSubmittedRefId(generatedRefId);
 
-			// Collect all documents/proofs uploaded across all sections and combine into a single master PDF
-			const attachmentsToMerge = [
-				{ name: 'Detailed Resume & CV (Q18)', dataUrl: formData.resumeDataUrl || '' },
-				{ name: 'Semester Marksheet Proof (Q8)', dataUrl: formData.marksheetDataUrl || '' },
-				{ name: 'Journal / Book Chapter Proof (Q9)', dataUrl: formData.journalFileDataUrl || '' },
-				{ name: 'Patent / IPR Certificate (Q10)', dataUrl: formData.patentFileDataUrl || '' },
-				{ name: 'Competition Certificate (Q11)', dataUrl: formData.competitionFileDataUrl || '' },
-				{ name: 'Activity Certificate (Q12)', dataUrl: formData.activityFileDataUrl || '' },
-				{ name: 'Achievement Certificate (Q13)', dataUrl: formData.achievementFileDataUrl || '' },
-			].filter((p) => p.dataUrl && p.dataUrl.length > 0);
-
-			console.log(
-				`[Master PDF Generation] Combining Cadet Application Form + ${attachmentsToMerge.length} uploaded document(s)...`,
-			);
-			const { mergedDataUrl, totalPages, attachedCount } = await generateMasterCombinedPdf(
-				formData,
-				generatedRefId,
-				attachmentsToMerge,
-			);
-
-			setMasterPdfUrl(mergedDataUrl);
-			setMasterPdfPageCount(totalPages);
-
-			// Strip redundant individual base64 binaries to optimize network payload size
-			const cleanFormData: Partial<FormData> = { ...formData };
-			delete cleanFormData.marksheetDataUrl;
-			delete cleanFormData.journalFileDataUrl;
-			delete cleanFormData.patentFileDataUrl;
-			delete cleanFormData.competitionFileDataUrl;
-			delete cleanFormData.activityFileDataUrl;
-			delete cleanFormData.achievementFileDataUrl;
-			delete cleanFormData.leadershipFileDataUrl;
-
 			const payload = {
-				...cleanFormData,
+				...formData,
 				referenceId: generatedRefId,
 				submittedAt: new Date().toISOString(),
 				templateDocId: '1x69S7y0X7UJYR7x2ZEKCoQzPFCb-2nHctp6XNQG3E7I',
-				// Combined master single PDF containing full application form + all uploaded proofs & resume
-				combinedPdfDataUrl: mergedDataUrl || formData.resumeDataUrl,
-				mergedPdfCount: totalPages,
-				attachedDocumentCount: attachedCount,
-				// Ensure main resumeDataUrl holds the merged master PDF for Drive & Email
-				resumeDataUrl: mergedDataUrl || formData.resumeDataUrl,
 			};
 
 			const rawDirectUrl =
@@ -872,7 +864,7 @@ export default function Home() {
 					<div className='w-full banner-frame-container p-2.5 sm:p-4 flex justify-center'>
 						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden banner-frame-inner'>
 							<Image
-								src='/iic-banner-2026.png'
+								src='/iic-banner-v5.png'
 								alt='IMU Kolkata Campus - Institution Innovation Council (IIC) 2026-27'
 								width={2800}
 								height={600}
@@ -974,191 +966,23 @@ export default function Home() {
 
 					{/* SUCCESS CONFIRMATION VIEW */}
 					{submitted ? (
-						<div className='p-6 sm:p-12 text-center bg-white space-y-7 animate-fadeIn'>
+						<div className='p-8 sm:p-16 text-center bg-white space-y-6 animate-fadeIn max-w-2xl mx-auto'>
 							<div className='w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center mx-auto text-4xl shadow-lg shadow-emerald-500/20'>
 								<Check className='w-10 h-10 stroke-[2.5]' />
 							</div>
-							<div>
-								<span className='text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100/90 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs'>
-									Enrollment form submitted
+							<div className='space-y-3'>
+								<span className='inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100/90 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs'>
+									<CheckCircle2 className='w-3.5 h-3.5 text-emerald-700' /> Application Submitted
 								</span>
-								<h2 className='text-2xl sm:text-3xl font-extrabold text-[#0e2544] uppercase tracking-tight mt-3.5 font-heading'>
-									IIC Cadet Council 2026-27
+								<h2 className='text-2xl sm:text-3xl font-extrabold text-[#0e2544] uppercase tracking-tight font-heading'>
+									Enrollment Form Submitted Successfully!
 								</h2>
-								<p className='text-sm sm:text-base text-slate-600 mt-2 max-w-lg mx-auto leading-relaxed'>
+								<p className='text-sm sm:text-base text-slate-600 max-w-lg mx-auto leading-relaxed'>
 									Thank you, <span className='font-bold text-[#0e2544]'>{formData.cadetName}</span>.
 									Your enrollment application and credentials for the{' '}
-									<strong>IIC Student Council 2026–27</strong> have been submitted successfully.
+									<strong>Institution’s Innovation Council (IIC) 2026–27</strong> have been received
+									successfully.
 								</p>
-							</div>
-
-							{/* Summary Card */}
-							<div className='text-left bg-gradient-to-b from-slate-50 to-white border border-slate-200 rounded-2xl p-5 sm:p-7 text-sm space-y-4 max-w-xl mx-auto shadow-sm'>
-								{submittedRefId && (
-									<div className='flex justify-between items-center border-b border-sky-200 pb-3.5 bg-gradient-to-r from-sky-100/70 to-sky-50 -mx-5 -mt-5 sm:-mx-7 sm:-mt-7 p-4 sm:p-5 rounded-t-2xl'>
-										<div>
-											<span className='text-sky-900 font-bold text-[11px] uppercase tracking-wider block'>
-												Application Reference ID:
-											</span>
-											<span className='font-mono font-black text-sky-950 text-base sm:text-xl'>
-												{submittedRefId}
-											</span>
-										</div>
-										<div className='flex items-center gap-2'>
-											<button
-												type='button'
-												onClick={handleCopyRefId}
-												className='btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 shadow-2xs bg-white'>
-												{copiedRefId ? (
-													<>
-														<CheckCheck className='w-3.5 h-3.5 text-emerald-600' />
-														<span className='text-emerald-700 font-bold'>Copied</span>
-													</>
-												) : (
-													<>
-														<Copy className='w-3.5 h-3.5 text-slate-600' />
-														<span>Copy ID</span>
-													</>
-												)}
-											</button>
-											<span className='text-xs font-bold text-emerald-800 bg-white px-2.5 py-1.5 rounded-lg border border-emerald-300 shadow-2xs'>
-												● Submitted
-											</span>
-										</div>
-									</div>
-								)}
-
-								<div className='flex items-center gap-4 pb-4 border-b border-slate-200'>
-									{formData.photoDataUrl && (
-										// eslint-disable-next-line @next/next/no-img-element
-										<img
-											src={formData.photoDataUrl}
-											alt='Cadet'
-											className='w-16 h-16 rounded-2xl object-cover border-2 border-slate-300 shadow-xs flex-shrink-0'
-										/>
-									)}
-									<div>
-										<span className='text-xs text-slate-500 font-bold block uppercase tracking-wider'>
-											Cadet Name
-										</span>
-										<span className='font-black text-lg sm:text-xl text-[#0e2544]'>
-											{formData.cadetName}
-										</span>
-									</div>
-								</div>
-
-								<div className='grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs sm:text-sm border-b border-slate-200 pb-4'>
-									<div>
-										<span className='text-slate-500 font-medium block'>Registration / Roll:</span>
-										<span className='font-mono font-bold text-[#0e2544]'>{formData.regNumber}</span>
-									</div>
-									<div>
-										<span className='text-slate-500 font-medium block'>Program & Year:</span>
-										<span className='font-semibold text-slate-800'>
-											{formData.department} ({formData.yearOfStudy} • {formData.semester})
-										</span>
-									</div>
-									<div>
-										<span className='text-slate-500 font-medium block'>Current CGPA:</span>
-										<span className='font-bold text-[#0e2544]'>
-											{formData.cgpa || 'First Year / N/A'}
-										</span>
-									</div>
-									<div>
-										<span className='text-slate-500 font-medium block'>Contact Info:</span>
-										<span className='font-semibold text-slate-800'>
-											{formData.phone} • {formData.email}
-										</span>
-									</div>
-								</div>
-
-								{/* Attached Files & Sections Summary */}
-								<div className='space-y-2.5 text-xs'>
-									<div className='space-y-1.5 pt-1'>
-										<div className='flex items-center gap-2 text-slate-700'>
-											<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-											<span>
-												<strong>Detailed Resume / CV & Proofs:</strong> {formData.resumeName}
-											</span>
-										</div>
-										{formData.hasJournalPub && formData.journalFileName && (
-											<div className='flex items-center gap-2 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-												<span>
-													<strong>Journal / Book Chapter Proof:</strong> {formData.journalFileName}
-												</span>
-											</div>
-										)}
-										{formData.hasPatents && formData.patentFileName && (
-											<div className='flex items-center gap-2 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-												<span>
-													<strong>Patent/IPR Proof:</strong> {formData.patentFileName}
-												</span>
-											</div>
-										)}
-										{formData.hasCompetitions && formData.competitionFileName && (
-											<div className='flex items-center gap-2 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-												<span>
-													<strong>Competition Certificate:</strong> {formData.competitionFileName}
-												</span>
-											</div>
-										)}
-										{formData.hasActivities && formData.activityFileName && (
-											<div className='flex items-center gap-2 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-												<span>
-													<strong>Activity Certificate:</strong> {formData.activityFileName}
-												</span>
-											</div>
-										)}
-										{formData.hasAchievements && formData.achievementFileName && (
-											<div className='flex items-center gap-2 text-slate-700'>
-												<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-												<span>
-													<strong>Award/Achievement Proof:</strong> {formData.achievementFileName}
-												</span>
-											</div>
-										)}
-									</div>
-								</div>
-
-								{/* Areas of Interest Summary */}
-								{formData.areasOfInterest.length > 0 && (
-									<div className='pt-2.5 border-t border-slate-200'>
-										<span className='font-bold text-[#0e2544] uppercase tracking-wider block text-xs mb-2'>
-											Innovation Focus Areas:
-										</span>
-										<div className='flex flex-wrap gap-1.5'>
-											{formData.areasOfInterest.map((tag) => (
-												<span
-													key={tag}
-													className='text-[11px] bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg font-medium border border-slate-200'>
-													{tag}
-												</span>
-											))}
-										</div>
-									</div>
-								)}
-
-								{/* Master Combined PDF Download & Status */}
-								{masterPdfUrl && (
-									<div className='pt-3.5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-										<div className='flex items-center gap-2'>
-											<CheckCircle2 className='w-4 h-4 text-emerald-600 flex-shrink-0' />
-											<span className='font-bold text-slate-800 text-xs sm:text-sm'>
-												Master Merged PDF ({masterPdfPageCount} Pages Generated)
-											</span>
-										</div>
-										<a
-											href={masterPdfUrl}
-											download={`IIC_Enrollment_${formData.regNumber || 'Cadet'}_Master.pdf`}
-											className='btn-primary py-2 px-4 text-xs inline-flex items-center justify-center gap-1.5 shadow-sm bg-gradient-to-r from-[#0e2544] to-[#163866] hover:from-[#163866] hover:to-[#0e2544]'>
-											<FileCheck className='w-3.5 h-3.5 text-sky-300' /> Download Master PDF
-										</a>
-									</div>
-								)}
 							</div>
 						</div>
 					) : (
@@ -1180,13 +1004,13 @@ export default function Home() {
 
 								<ol
 									role='list'
-									className='grid grid-cols-5 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto w-full'>
+									className='grid grid-cols-5 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto w-full items-stretch'>
 									{SECTIONS.map((sec) => {
 										const isCurrent = currentStep === sec.id;
 										const isCompleted = completedSteps.includes(sec.id) && !isCurrent;
 
 										return (
-											<li key={sec.id} className='list-none'>
+											<li key={sec.id} className='list-none flex'>
 												<button
 													type='button'
 													onClick={() => handleStepClick(sec.id)}
@@ -1199,9 +1023,9 @@ export default function Home() {
 																? `${sec.title} (Completed)`
 																: `${sec.title}`
 													}
-													className={`group relative w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:outline-none ${
+													className={`group relative w-full h-11 sm:h-12 flex items-center justify-center gap-1.5 sm:gap-2 px-1 sm:px-3 rounded-full text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:outline-none ${
 														isCurrent
-															? 'bg-gradient-to-r from-[#0e2544] to-[#163866] text-white shadow-md ring-2 ring-sky-400/40 scale-[1.02]'
+															? 'bg-gradient-to-r from-[#0e2544] to-[#163866] text-white shadow-sm ring-2 ring-sky-400/50'
 															: isCompleted
 																? 'bg-emerald-50 text-emerald-950 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
 																: 'bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
@@ -1264,7 +1088,7 @@ export default function Home() {
 										<span className='section-badge'>Section 1 of 5</span>
 									</div>
 
-									{/* Row 1: 1. Name of Cadet & 2. Year of Study */}
+									{/* Row 1: 1. Name of Cadet & 2. Department / Academic Program */}
 									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
 										<div id='cadetName' className='space-y-1.5'>
 											<label
@@ -1295,105 +1119,12 @@ export default function Home() {
 												</p>
 											)}
 										</div>
-
-										<div id='yearOfStudy' className='space-y-1.5'>
-											<label
-												htmlFor='yearOfStudySelect'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<Calendar className='w-3.5 h-3.5 text-sky-700' />
-												<span>2. Year of Study</span>
-												<span className='text-red-600 font-bold'>*</span>
-											</label>
-											<select
-												id='yearOfStudySelect'
-												name='yearOfStudy'
-												value={formData.yearOfStudy}
-												onChange={handleChange}
-												className='form-input cursor-pointer font-medium h-[46px]'>
-												<option value='1st Year'>1st Year</option>
-												<option value='2nd Year'>2nd Year</option>
-												<option value='3rd Year'>3rd Year</option>
-												<option value='4th Year'>4th Year</option>
-											</select>
-											<p className='text-xs text-slate-500 mt-1 font-medium'>
-												Select your current academic batch.
-											</p>
-										</div>
-									</div>
-
-									{/* Row 2: 3. Roll No. / Serial No. & 4. Current Semester */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div id='regNumber' className='space-y-1.5'>
-											<label
-												htmlFor='regNumberInput'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<Hash className='w-3.5 h-3.5 text-sky-700' />
-												<span>
-													3. {isFirstYear ? '. Reg No/ Serial No.' : 'University Registration No'}
-												</span>
-												<span className='text-red-600 font-bold'>*</span>
-											</label>
-											<input
-												type='text'
-												id='regNumberInput'
-												name='regNumber'
-												value={formData.regNumber}
-												onChange={handleChange}
-												onBlur={handleBlur}
-												placeholder={
-													isFirstYear
-														? 'Enter allotted Reg No./ Serial Number'
-														: 'Enter permanent University Reg Number'
-												}
-												className={`form-input font-mono ${errors.regNumber && touched.regNumber ? 'input-error' : ''}`}
-											/>
-											{errors.regNumber && touched.regNumber ? (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
-													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.regNumber}
-												</p>
-											) : (
-												<p className='text-xs text-slate-500 mt-1 font-medium'>
-													{isFirstYear
-														? 'First-year cadets enter your registration number / serial number.'
-														: 'Enter your permanent university registration number.'}
-												</p>
-											)}
-										</div>
-
-										<div id='semester' className='space-y-1.5'>
-											<label
-												htmlFor='semesterSelect'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<GraduationCap className='w-3.5 h-3.5 text-sky-700' />
-												<span>4. Current Semester</span>
-												<span className='text-red-600 font-bold'>*</span>
-											</label>
-											<select
-												id='semesterSelect'
-												name='semester'
-												value={formData.semester}
-												onChange={handleChange}
-												className='form-input cursor-pointer font-medium h-[46px]'>
-												{SEMESTERS.map((sem) => (
-													<option key={sem} value={sem}>
-														{sem}
-													</option>
-												))}
-											</select>
-											<p className='text-xs text-slate-500 mt-1 font-medium'>
-												Select ongoing semester.
-											</p>
-										</div>
-									</div>
-
-									{/* Row 3: 5. Department & Gender */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start'>
-										<div className='space-y-1.5'>
+										<div id='department' className='space-y-1.5'>
 											<label
 												htmlFor='department'
 												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 												<Building2 className='w-3.5 h-3.5 text-sky-700' />
-												<span>5. Department / Academic Program</span>
+												<span>2. Department / Academic Program</span>
 												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<select
@@ -1408,8 +1139,104 @@ export default function Home() {
 													</option>
 												))}
 											</select>
+											<p className='text-xs text-slate-500 mt-1 font-medium'>
+												{isPostGraduate
+													? '2-Year Postgraduate (PG) Program'
+													: '4-Year Undergraduate (UG) Program'}
+											</p>
 										</div>
+									</div>
 
+									{/* Row 2: 3. Year of Study & 4. Current Semester */}
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
+										<div id='yearOfStudy' className='space-y-1.5'>
+											<label
+												htmlFor='yearOfStudySelect'
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<Calendar className='w-3.5 h-3.5 text-sky-700' />
+												<span>3. Year of Study</span>
+												<span className='text-red-600 font-bold'>*</span>
+											</label>
+											<select
+												id='yearOfStudySelect'
+												name='yearOfStudy'
+												value={formData.yearOfStudy}
+												onChange={handleChange}
+												className='form-input cursor-pointer font-medium h-[46px]'>
+												{availableYears.map((yr) => (
+													<option key={yr} value={yr}>
+														{yr}
+													</option>
+												))}
+											</select>
+											<p className='text-xs text-slate-500 mt-1 font-medium'>
+												Select your current academic batch.
+											</p>
+										</div>
+										<div id='semester' className='space-y-1.5'>
+											<label
+												htmlFor='semesterSelect'
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<GraduationCap className='w-3.5 h-3.5 text-sky-700' />
+												<span>4. Current Semester</span>
+												<span className='text-red-600 font-bold'>*</span>
+											</label>
+											<select
+												id='semesterSelect'
+												name='semester'
+												value={formData.semester}
+												onChange={handleChange}
+												className='form-input cursor-pointer font-medium h-[46px]'>
+												{availableSemesters.map((sem) => (
+													<option key={sem} value={sem}>
+														{sem}
+													</option>
+												))}
+											</select>
+											<p className='text-xs text-slate-500 mt-1 font-medium'>
+												Select ongoing semester.
+											</p>
+										</div>
+									</div>
+
+									{/* Row 3: 5. Reg No / Roll No & Gender */}
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start'>
+										<div id='regNumber' className='space-y-1.5'>
+											<label
+												htmlFor='regNumberInput'
+												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+												<Hash className='w-3.5 h-3.5 text-sky-700' />
+												<span>
+													5. {isFirstYear ? 'Reg No. / Roll No.' : 'University Reg No. / Roll No.'}
+												</span>
+												<span className='text-red-600 font-bold'>*</span>
+											</label>
+											<input
+												type='text'
+												id='regNumberInput'
+												name='regNumber'
+												value={formData.regNumber}
+												onChange={handleChange}
+												onBlur={handleBlur}
+												placeholder={
+													isFirstYear
+														? 'Enter allotted Reg No. / Roll No.'
+														: 'Enter permanent University Reg No. / Roll No.'
+												}
+												className={`form-input font-mono ${errors.regNumber && touched.regNumber ? 'input-error' : ''}`}
+											/>
+											{errors.regNumber && touched.regNumber ? (
+												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.regNumber}
+												</p>
+											) : (
+												<p className='text-xs text-slate-500 mt-1 font-medium'>
+													{isFirstYear
+														? 'First-year cadets enter your registration number / roll number.'
+														: 'Enter your permanent university registration number / roll number.'}
+												</p>
+											)}
+										</div>
 										<div className='space-y-1.5'>
 											<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
 												Gender <span className='text-red-600 font-bold'>*</span>
@@ -1539,7 +1366,7 @@ export default function Home() {
 															<Check className='w-4 h-4 text-emerald-600' /> {formData.photoName}
 														</span>
 													) : (
-														'Accepts JPG, JPEG, PNG, up to 10MB'
+														'Accepts JPG, JPEG, PNG, up to 5MB'
 													)}
 												</p>
 											</div>
@@ -1568,24 +1395,37 @@ export default function Home() {
 													Academic & Research Profile
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 8 to 11 • CGPA, Publications, IPR & Competitions
+													Questions 8 to 11 • Cadets should only upload the first page of their work
+													in PDF format
 												</p>
 											</div>
 										</div>
 										<span className='section-badge'>Section 2 of 5</span>
 									</div>
 
+									{/* Section 2 Guideline Notice */}
+									<div className='p-3.5 sm:p-4 rounded-xl bg-sky-50 border border-sky-200/80 text-sky-950 flex items-center gap-2.5 text-xs sm:text-sm font-medium shadow-2xs'>
+										<Info className='w-4 h-4 text-sky-700 flex-shrink-0' />
+										<span>
+											<strong>Important Upload Guideline:</strong> Cadets should only upload the{' '}
+											<strong>first page</strong> of their work in PDF format for all questions in
+											this section.
+										</span>
+									</div>
+
 									{/* Question 8: Current CGPA */}
 									<div id='cgpa' className='section-container space-y-3'>
-										<div className='flex items-baseline justify-between mb-1 flex-wrap gap-2'>
-											<label
-												htmlFor='cgpaInput'
-												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												8. Current CGPA{' '}
-												{!isFirstYear && <span className='text-red-600 font-bold'>*</span>}
-											</label>
-											<span className='text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-0.5 rounded-full border border-slate-200'>
-												{isFirstYear ? 'Exempted (1st Year)' : 'Required'}
+										<div className='flex items-center justify-between mb-1 flex-wrap gap-2'>
+											<div>
+												<label
+													htmlFor='cgpaInput'
+													className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+													8. Current CGPA{' '}
+													{!isFirstYear && <span className='text-red-600 font-bold'>*</span>}
+												</label>
+											</div>
+											<span className='text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200'>
+												{isFirstYear ? 'Exempted for first semester cadets' : 'Mention your CGPA'}
 											</span>
 										</div>
 
@@ -1601,7 +1441,7 @@ export default function Home() {
 													onBlur={handleBlur}
 													placeholder={
 														isFirstYear
-															? 'Disabled for 1st Year Cadets'
+															? 'Exempted for first semester cadets'
 															: 'Enter your Current CGPA (e.g. 8.75)'
 													}
 													className={`form-input ${
@@ -1631,8 +1471,7 @@ export default function Home() {
 													</label>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
-													Mention paper / book chapter details & upload publication proof PDF (if
-													selected).
+													Mention Journal / Book chapter details & upload publication proof PDF
 												</span>
 											</div>
 											{/* N/A Toggle */}
@@ -1673,7 +1512,7 @@ export default function Home() {
 											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
 													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
-														Paper / Book Chapter Publication Details{' '}
+														Journal / Book Chapter Publication Details{' '}
 														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
@@ -1681,7 +1520,7 @@ export default function Home() {
 														rows={2}
 														value={formData.journalDetails}
 														onChange={handleChange}
-														placeholder='Paper / Book Chapter Title, Journal / Book Name, Publisher / Conference, ISSN / ISBN / DOI, Volume, Year...'
+														placeholder='Journal / Book Chapter Title, Journal / Book Name, Publisher, ISSN / ISBN, Volume, Year, DOI.'
 														className={`form-input resize-none ${errors.journalDetails && touched.journalDetails ? 'input-error' : ''}`}
 													/>
 													{errors.journalDetails && touched.journalDetails && (
@@ -1718,7 +1557,7 @@ export default function Home() {
 															</span>
 														) : (
 															<span className='text-slate-500 font-medium'>
-																Upload publication / chapter proof PDF{' '}
+																Upload publication / chapter proof PDF (First page only){' '}
 																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
@@ -1757,8 +1596,7 @@ export default function Home() {
 													</label>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
-													Mention IPR details & upload certificate / filing document in PDF (if
-													selected).
+													Mention IPR details & upload certificate / filing document in PDF
 												</span>
 											</div>
 											{/* N/A Toggle */}
@@ -1843,7 +1681,7 @@ export default function Home() {
 															</span>
 														) : (
 															<span className='text-slate-500 font-medium'>
-																Upload patent/filing PDF{' '}
+																Upload patent / filing PDF (First page only){' '}
 																<span className='text-red-600 font-bold'>*</span>
 															</span>
 														)}
@@ -1882,7 +1720,7 @@ export default function Home() {
 													</label>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
-													Mention event & achievement, and upload certificate in PDF (if selected).
+													Mention competitions and upload certificate in PDF.
 												</span>
 											</div>
 											{/* N/A Toggle */}
@@ -1929,7 +1767,7 @@ export default function Home() {
 											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
 													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
-														Event & Achievement Details{' '}
+														Competition & Achievement Details{' '}
 														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
@@ -1937,7 +1775,7 @@ export default function Home() {
 														rows={2}
 														value={formData.competitionDetails}
 														onChange={handleChange}
-														placeholder='Event Name, Organising Body, Year, Project/Role, Achievement (Winner, Finalist, Participant)...'
+														placeholder='Competition Name, Organising Body, Year, Project/Role, Achievement (Winner, Finalist, Participant)...'
 														className={`form-input resize-none ${errors.competitionDetails && touched.competitionDetails ? 'input-error' : ''}`}
 													/>
 													{errors.competitionDetails && touched.competitionDetails && (
@@ -2036,12 +1874,12 @@ export default function Home() {
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
 													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														12. Technical / Co-Curricular Activities, if any
+														12. Activities / Events if any
 													</label>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
 													Mention the activity, event, and your role, and upload certificate in PDF
-													(if selected).
+													.
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
@@ -2076,7 +1914,7 @@ export default function Home() {
 															? 'bg-emerald-700 text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													+ I Have Activities
+													+ I Have Activities / Events
 												</button>
 											</div>
 										</div>
@@ -2093,7 +1931,7 @@ export default function Home() {
 														rows={2}
 														value={formData.activityDetails}
 														onChange={handleChange}
-														placeholder='Activity / Workshop, Organizing Body, Role & Contributions...'
+														placeholder='Activity / Events, Organizing Body, Role & Contributions...'
 														className={`form-input resize-none ${errors.activityDetails && touched.activityDetails ? 'input-error' : ''}`}
 													/>
 													{errors.activityDetails && touched.activityDetails && (
@@ -2165,11 +2003,11 @@ export default function Home() {
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
 													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														13. Major Achievements / Awards, if any
+														13. Participation in Conference / Awards, if any
 													</label>
 												</div>
 												<span className='text-xs text-slate-500 block mt-1'>
-													Mention the achievement & upload certificate / proof in PDF (if selected).
+													Mention the conference / award & upload certificate / proof in PDF.
 												</span>
 											</div>
 											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
@@ -2206,7 +2044,7 @@ export default function Home() {
 															? 'bg-emerald-700 text-white shadow-xs'
 															: 'text-slate-600 hover:text-slate-900'
 													}`}>
-													+ I Have Achievements
+													+ I Have Participated / Won Awards
 												</button>
 											</div>
 										</div>
@@ -2215,7 +2053,7 @@ export default function Home() {
 											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
 												<div>
 													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
-														Achievement & Award Details{' '}
+														Participation & Award Details{' '}
 														<span className='text-red-600 font-bold'>*</span>
 													</label>
 													<textarea
@@ -2395,8 +2233,8 @@ export default function Home() {
 											<label
 												htmlFor='problemMaritimeInput'
 												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
-												15. What Problem in the Indian Maritime University Ecosystem you would like
-												to solve? <span className='text-red-600 font-bold'>*</span>
+												15. What is one Problem in the Indian Maritime University Ecosystem you
+												would like to solve? <span className='text-red-600 font-bold'>*</span>
 											</label>
 											<p className='text-xs text-slate-500 leading-relaxed block mt-1'>
 												Briefly describe the problem and why you think it needs to be addressed.
@@ -2428,7 +2266,7 @@ export default function Home() {
 											<label
 												htmlFor='problemSocietyInput'
 												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
-												16. What Problem in Society you would like to solve?
+												16. What is one Problem in Society you would like to solve?
 												<span className='text-red-600 font-bold'>*</span>
 											</label>
 											<p className='text-xs text-slate-500 leading-relaxed block mt-1'>
@@ -2559,7 +2397,7 @@ export default function Home() {
 													<label
 														htmlFor='resumeInput'
 														className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-														18. Upload Detailed Resume / CV (PDF)
+														18. Upload Resume / CV (PDF)
 													</label>
 													<span className='text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded-full'>
 														Recommended

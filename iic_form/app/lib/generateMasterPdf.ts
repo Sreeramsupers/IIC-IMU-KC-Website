@@ -1,4 +1,4 @@
-﻿import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 export interface CadetFormData {
 	cadetName: string;
@@ -342,34 +342,34 @@ export async function generateMasterCombinedPdf(
 	);
 
 	y -= 16;
-	page1.drawText('2. Year of Study:', {
+	page1.drawText('2. Department:', {
 		x: leftColX,
 		y,
 		size: 7.5,
 		font: fontBold,
 		color: textMuted,
 	});
-	page1.drawText(sanitizePdfText(formData.yearOfStudy || 'N/A'), {
+	page1.drawText(sanitizePdfText(formData.department || 'N/A'), {
 		x: leftColX + 90,
 		y,
-		size: 8,
+		size: 7.5,
 		font: fontReg,
 		color: textDark,
 	});
 
-	page1.drawText('3. Reg / Serial No:', {
+	page1.drawText('3. Year of Study:', {
 		x: midColX,
 		y,
 		size: 7.5,
 		font: fontBold,
 		color: textMuted,
 	});
-	page1.drawText(sanitizePdfText(formData.regNumber || 'N/A'), {
+	page1.drawText(sanitizePdfText(formData.yearOfStudy || 'N/A'), {
 		x: midColX + 85,
 		y,
 		size: 8,
-		font: fontBold,
-		color: navy,
+		font: fontReg,
+		color: textDark,
 	});
 
 	y -= 16;
@@ -388,19 +388,19 @@ export async function generateMasterCombinedPdf(
 		color: textDark,
 	});
 
-	page1.drawText('5. Department:', {
+	page1.drawText('5. Reg / Roll No:', {
 		x: midColX,
 		y,
 		size: 7.5,
 		font: fontBold,
 		color: textMuted,
 	});
-	page1.drawText(sanitizePdfText(formData.department || 'N/A'), {
+	page1.drawText(sanitizePdfText(formData.regNumber || 'N/A'), {
 		x: midColX + 85,
 		y,
 		size: 8,
-		font: fontReg,
-		color: textDark,
+		font: fontBold,
+		color: navy,
 	});
 
 	y -= 16;
@@ -479,8 +479,8 @@ export async function generateMasterCombinedPdf(
 		color: navy,
 	});
 	const cgpaDisplay =
-		formData.yearOfStudy === '1st Year'
-			? 'Exempted (1st Year Cadet)'
+		formData.yearOfStudy === '1st Year' || formData.semester === 'Semester 1'
+			? 'Exempted for first semester cadets'
 			: formData.cgpa || 'N/A';
 	page1.drawText(sanitizePdfText(cgpaDisplay), {
 		x: leftColX + 110,
