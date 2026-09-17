@@ -18,6 +18,26 @@ export async function POST(req: NextRequest) {
 	try {
 		const data = await req.json();
 
+		// Basic Validation: Ensure required cadet profile fields are present
+		if (!data.cadetName || typeof data.cadetName !== 'string' || !data.cadetName.trim()) {
+			return NextResponse.json(
+				{ success: false, error: 'Cadet Name is required.' },
+				{ status: 400 },
+			);
+		}
+		if (!data.email || typeof data.email !== 'string' || !data.email.includes('@')) {
+			return NextResponse.json(
+				{ success: false, error: 'A valid Cadet Email address is required.' },
+				{ status: 400 },
+			);
+		}
+		if (!data.regNumber || typeof data.regNumber !== 'string' || !data.regNumber.trim()) {
+			return NextResponse.json(
+				{ success: false, error: 'Registration Number is required.' },
+				{ status: 400 },
+			);
+		}
+
 		const referenceId = data.referenceId || `IIC-2627-${Math.floor(1000 + Math.random() * 9000)}`;
 
 		const rawUrl =

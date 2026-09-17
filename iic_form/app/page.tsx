@@ -28,6 +28,7 @@ import {
 	Compass,
 	Calendar,
 } from 'lucide-react';
+import { generateMasterCombinedPdf } from './lib/generateMasterPdf';
 
 export interface FormData {
 	// Section 1: Basic Cadet Profile (Q1 - Q7 + Photo)
@@ -212,6 +213,7 @@ export default function Home() {
 	const [submitting, setSubmitting] = useState(false);
 	const [submittedRefId, setSubmittedRefId] = useState('');
 	const [draftSaved, setDraftSaved] = useState(false);
+	const [submissionError, setSubmissionError] = useState<string | null>(null);
 
 	const isFirstYear = formData.yearOfStudy === '1st Year' || formData.semester === 'Semester 1';
 	const isPostGraduate =
@@ -761,16 +763,182 @@ export default function Home() {
 		}
 
 		setSubmitting(true);
+		setSubmissionError(null);
 
 		try {
 			const generatedRefId = `IIC-2627-${Math.floor(1000 + Math.random() * 9000)}`;
 			setSubmittedRefId(generatedRefId);
 
+			// Compute dynamic PDF status indicators ("attached" or "NIL")
+			const marksheet_pdf = isFirstYear
+				? 'NIL (Exempted for 1st Year)'
+				: formData.marksheetDataUrl
+					? 'attached'
+					: 'NIL';
+			const journal_pdf =
+				formData.hasJournalPub && (formData.journalFileDataUrl || formData.journalFileName)
+					? 'attached'
+					: 'NIL';
+			const patent_pdf =
+				formData.hasPatents && (formData.patentFileDataUrl || formData.patentFileName)
+					? 'attached'
+					: 'NIL';
+			const competition_pdf =
+				formData.hasCompetitions &&
+				(formData.competitionFileDataUrl || formData.competitionFileName)
+					? 'attached'
+					: 'NIL';
+			const activity_pdf =
+				formData.hasActivities && (formData.activityFileDataUrl || formData.activityFileName)
+					? 'attached'
+					: 'NIL';
+			const achievement_pdf =
+				formData.hasAchievements &&
+				(formData.achievementFileDataUrl || formData.achievementFileName)
+					? 'attached'
+					: 'NIL';
+			const leadership_pdf =
+				formData.hasLeadership && (formData.leadershipFileDataUrl || formData.leadershipFileName)
+					? 'attached'
+					: 'NIL';
+			const resume_pdf =
+				formData.hasResume && (formData.resumeDataUrl || formData.resumeName) ? 'attached' : 'NIL';
+
+			// Format detail fields (or "NIL")
+			const journalDetailsFormatted =
+				formData.hasJournalPub && formData.journalDetails.trim()
+					? formData.journalDetails.trim()
+					: 'NIL';
+			const patentDetailsFormatted =
+				formData.hasPatents && formData.patentDetails.trim()
+					? formData.patentDetails.trim()
+					: 'NIL';
+			const competitionDetailsFormatted =
+				formData.hasCompetitions && formData.competitionDetails.trim()
+					? formData.competitionDetails.trim()
+					: 'NIL';
+			const activityDetailsFormatted =
+				formData.hasActivities && formData.activityDetails.trim()
+					? formData.activityDetails.trim()
+					: 'NIL';
+			const achievementDetailsFormatted =
+				formData.hasAchievements && formData.achievementDetails.trim()
+					? formData.achievementDetails.trim()
+					: 'NIL';
+			const leadershipDetailsFormatted =
+				formData.hasLeadership && formData.leadershipDetails.trim()
+					? formData.leadershipDetails.trim()
+					: 'NIL';
+			const interestsFormatted =
+				formData.areasOfInterest.length > 0 ? formData.areasOfInterest.join(', ') : 'NIL';
+			const declarationFormatted = formData.declarationAccepted
+				? 'Accepted and Signed Digitally'
+				: 'Not Accepted';
+			const displayDate = new Date().toLocaleDateString('en-GB');
+
+			// Collect all uploaded proof files for single attachment PDF compilation
+			const attachedProofs: { name: string; type: string; dataUrl: string }[] = [];
+			if (formData.marksheetDataUrl) {
+				attachedProofs.push({
+					name: formData.marksheetName || 'Semester_Marksheet.pdf',
+					type: 'marksheet',
+					dataUrl: formData.marksheetDataUrl,
+				});
+			}
+			if (formData.hasJournalPub && formData.journalFileDataUrl) {
+				attachedProofs.push({
+					name: formData.journalFileName || 'Journal_Publication.pdf',
+					type: 'journal',
+					dataUrl: formData.journalFileDataUrl,
+				});
+			}
+			if (formData.hasPatents && formData.patentFileDataUrl) {
+				attachedProofs.push({
+					name: formData.patentFileName || 'Patent_IPR_Document.pdf',
+					type: 'patent',
+					dataUrl: formData.patentFileDataUrl,
+				});
+			}
+			if (formData.hasCompetitions && formData.competitionFileDataUrl) {
+				attachedProofs.push({
+					name: formData.competitionFileName || 'Competition_Certificate.pdf',
+					type: 'competition',
+					dataUrl: formData.competitionFileDataUrl,
+				});
+			}
+			if (formData.hasActivities && formData.activityFileDataUrl) {
+				attachedProofs.push({
+					name: formData.activityFileName || 'Activity_Certificate.pdf',
+					type: 'activity',
+					dataUrl: formData.activityFileDataUrl,
+				});
+			}
+			if (formData.hasAchievements && formData.achievementFileDataUrl) {
+				attachedProofs.push({
+					name: formData.achievementFileName || 'Achievement_Certificate.pdf',
+					type: 'achievement',
+					dataUrl: formData.achievementFileDataUrl,
+				});
+			}
+			if (formData.hasLeadership && formData.leadershipFileDataUrl) {
+				attachedProofs.push({
+					name: formData.leadershipFileName || 'Leadership_Proof.pdf',
+					type: 'leadership',
+					dataUrl: formData.leadershipFileDataUrl,
+				});
+			}
+			if (formData.hasResume && formData.resumeDataUrl) {
+				attachedProofs.push({
+					name: formData.resumeName || 'Cadet_Resume.pdf',
+					type: 'resume',
+					dataUrl: formData.resumeDataUrl,
+				});
+			}
+
+			// Generate the Complete Unified Master PDF (Form + Proofs) using pdf-lib
+			let compiledMasterPdfDataUrl = '';
+			try {
+				const masterPdfResult = await generateMasterCombinedPdf(
+					formData,
+					generatedRefId,
+					attachedProofs,
+				);
+				compiledMasterPdfDataUrl = masterPdfResult.mergedDataUrl;
+			} catch (pdfErr) {
+				console.warn('Could not compile local master PDF:', pdfErr);
+			}
+
+			// Streamlined payload: send masterPdfDataUrl without duplicating raw proof arrays
 			const payload = {
 				...formData,
 				referenceId: generatedRefId,
 				submittedAt: new Date().toISOString(),
 				templateDocId: '1x69S7y0X7UJYR7x2ZEKCoQzPFCb-2nHctp6XNQG3E7I',
+
+				// Computed PDF status variables for template
+				marksheet_pdf,
+				journal_pdf,
+				patent_pdf,
+				competition_pdf,
+				activity_pdf,
+				achievement_pdf,
+				leadership_pdf,
+				resume_pdf,
+
+				// Standardized details & replacements
+				journalDetails: journalDetailsFormatted,
+				patentDetails: patentDetailsFormatted,
+				competitionDetails: competitionDetailsFormatted,
+				activityDetails: activityDetailsFormatted,
+				achievementDetails: achievementDetailsFormatted,
+				leadershipDetails: leadershipDetailsFormatted,
+				interests: interestsFormatted,
+				declaration: declarationFormatted,
+				date: displayDate,
+
+				// Unified pre-merged single Master PDF
+				masterPdfDataUrl: compiledMasterPdfDataUrl,
+				attachedProofsCount: attachedProofs.length,
 			};
 
 			const rawDirectUrl =
@@ -781,52 +949,71 @@ export default function Home() {
 				.replace(/^['"]|['"]$/g, '')
 				.replace(/^h+ttps:\/\//i, 'https://');
 
+			let submissionSuccessful = false;
+
 			try {
 				const res = await fetch('/api/submit', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(payload),
 				});
-				if (!res.ok) {
-					throw new Error('Serverless route returned ' + res.status);
+				if (res.ok) {
+					submissionSuccessful = true;
+				} else {
+					throw new Error('Serverless route returned status ' + res.status);
 				}
 			} catch (apiError) {
 				console.warn(
 					'API route not reachable, submitting directly to Google Apps Script:',
 					apiError,
 				);
-				await fetch(directGoogleUrl, {
-					method: 'POST',
-					mode: 'no-cors',
-					headers: { 'Content-Type': 'text/plain' },
-					body: JSON.stringify(payload),
-				});
+				try {
+					await fetch(directGoogleUrl, {
+						method: 'POST',
+						mode: 'no-cors',
+						headers: { 'Content-Type': 'text/plain' },
+						body: JSON.stringify(payload),
+					});
+					submissionSuccessful = true;
+				} catch (directErr) {
+					console.error('Direct submission to Google Apps Script failed:', directErr);
+				}
 			}
 
-			// Clear draft on successful submission
-			try {
-				localStorage.removeItem('iic_form_draft_v2');
-			} catch {
-				// Ignore storage error
-			}
+			if (submissionSuccessful) {
+				// Clear draft on confirmed successful submission
+				try {
+					localStorage.removeItem('iic_form_draft_v2');
+				} catch {
+					// Ignore storage error
+				}
 
-			// Fire celebratory confetti!
-			try {
-				confetti({
-					particleCount: 130,
-					spread: 85,
-					origin: { y: 0.6 },
-					colors: ['#0e2544', '#0284c7', '#f59e0b', '#10b981', '#6366f1'],
-				});
-			} catch {
-				// Ignore confetti error
+				// Fire celebratory confetti!
+				try {
+					confetti({
+						particleCount: 130,
+						spread: 85,
+						origin: { y: 0.6 },
+						colors: ['#0e2544', '#0284c7', '#f59e0b', '#10b981', '#6366f1'],
+					});
+				} catch {
+					// Ignore confetti error
+				}
+
+				setSubmitted(true);
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			} else {
+				setSubmissionError(
+					'We could not submit your application due to a network connection issue. Please verify your internet and click Submit again.',
+				);
 			}
 		} catch (err) {
 			console.error('Submission request failed:', err);
+			setSubmissionError(
+				'An unexpected error occurred while processing your application. Please try submitting again.',
+			);
 		} finally {
 			setSubmitting(false);
-			setSubmitted(true);
-			window.scrollTo({ top: 0, behavior: 'smooth' });
 		}
 	};
 
@@ -837,6 +1024,7 @@ export default function Home() {
 		setCompletedSteps([]);
 		setCurrentStep(1);
 		setSubmitted(false);
+		setSubmissionError(null);
 		try {
 			localStorage.removeItem('iic_form_draft_v2');
 		} catch {
@@ -881,7 +1069,7 @@ export default function Home() {
 						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3.5'>
 							<div>
 								<div className='flex items-center gap-2 mb-1.5 flex-wrap'>
-									<span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold academic-badge shadow-2xs'>
+									<span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold academic-badge shadow-2xs'>
 										Academic Year 2026–27
 									</span>
 									<span className='inline-flex items-center gap-1 text-xs font-bold campus-badge uppercase tracking-wider'>
@@ -889,7 +1077,7 @@ export default function Home() {
 										Indian Maritime University - Kolkata Campus
 									</span>
 								</div>
-								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-black uppercase tracking-tight leading-tight main-title'>
+								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-black uppercase tracking-tight leading-snug sm:leading-tight main-title font-heading'>
 									Institution’s Innovation Council (IIC) – Cadet Enrollment Form
 								</h1>
 							</div>
@@ -911,7 +1099,7 @@ export default function Home() {
 										Important Notice / Instructions:
 									</h2>
 								</div>
-								<ol className='space-y-3 text-xs sm:text-[13.5px] leading-relaxed'>
+								<ol className='space-y-3 text-xs sm:text-[13px] leading-relaxed'>
 									<li className='flex items-start gap-3'>
 										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
 											1
@@ -966,7 +1154,7 @@ export default function Home() {
 
 					{/* SUCCESS CONFIRMATION VIEW */}
 					{submitted ? (
-						<div className='p-8 sm:p-16 text-center bg-white space-y-6 animate-fadeIn max-w-2xl mx-auto'>
+						<div className='p-8 sm:p-14 text-center bg-white space-y-6 animate-fadeIn max-w-2xl mx-auto'>
 							<div className='w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center mx-auto text-4xl shadow-lg shadow-emerald-500/20'>
 								<Check className='w-10 h-10 stroke-[2.5]' />
 							</div>
@@ -974,15 +1162,39 @@ export default function Home() {
 								<span className='inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100/90 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs'>
 									<CheckCircle2 className='w-3.5 h-3.5 text-emerald-700' /> Application Submitted
 								</span>
-								<h2 className='text-2xl sm:text-3xl font-extrabold text-[#0e2544] uppercase tracking-tight font-heading'>
+								<h2 className='text-2xl sm:text-3xl font-extrabold text-[#0e2544] uppercase tracking-tight leading-snug sm:leading-tight font-heading'>
 									Enrollment Form Submitted Successfully!
 								</h2>
 								<p className='text-sm sm:text-base text-slate-600 max-w-lg mx-auto leading-relaxed'>
 									Thank you, <span className='font-bold text-[#0e2544]'>{formData.cadetName}</span>.
-									Your enrollment application and credentials for the{' '}
-									<strong>Institution’s Innovation Council (IIC) 2026–27</strong> have been received
-									successfully.
+									Your enrollment application for the{' '}
+									<strong>Institution’s Innovation Council (IIC 2026–27)</strong> has been recorded.
 								</p>
+
+								{/* Reference ID Card */}
+								<div className='p-4 rounded-xl bg-slate-50 border border-slate-200 max-w-md mx-auto text-left space-y-1 text-xs sm:text-sm text-slate-700'>
+									<p>
+										<strong>Application Ref ID:</strong>{' '}
+										<span className='font-mono font-bold text-[#0284c7]'>{submittedRefId}</span>
+									</p>
+									<p>
+										<strong>Registered Email:</strong>{' '}
+										<span className='font-semibold'>{formData.email}</span>
+									</p>
+									<p className='text-xs text-slate-500 pt-1'>
+										A confirmation email with your compiled single-attachment PDF has been dispatched.
+									</p>
+								</div>
+
+								{/* Action Buttons */}
+								<div className='pt-2 flex items-center justify-center'>
+									<button
+										type='button'
+										onClick={handleReset}
+										className='btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-xs sm:text-sm'>
+										<RotateCcw className='w-4 h-4' /> Submit Another Form
+									</button>
+								</div>
 							</div>
 						</div>
 					) : (
@@ -1041,7 +1253,7 @@ export default function Home() {
 														{isCompleted ? <Check className='w-3 h-3 stroke-[2.5]' /> : sec.id}
 													</div>
 
-													<span className='truncate text-[10px] sm:text-xs tracking-tight text-center font-semibold sm:font-bold'>
+													<span className='truncate text-[11px] sm:text-xs tracking-tight text-center font-semibold sm:font-bold'>
 														<span className='sm:hidden'>{sec.shortTitle}</span>
 														<span className='hidden sm:inline'>{sec.title}</span>
 													</span>
@@ -1052,7 +1264,7 @@ export default function Home() {
 								</ol>
 
 								{/* Progress Completion Indicator */}
-								<div className='flex items-center justify-between text-[11px] text-slate-500 font-semibold mt-2.5 px-1 max-w-4xl mx-auto'>
+								<div className='flex items-center justify-between text-xs text-slate-500 font-semibold mt-2.5 px-1 max-w-4xl mx-auto'>
 									<span className='flex items-center gap-1.5'>
 										<Compass className='w-3.5 h-3.5 text-sky-600' />
 										Step {currentStep} of 5 • {SECTIONS[currentStep - 1]?.title}
@@ -1077,7 +1289,7 @@ export default function Home() {
 												<User className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
 													Cadet Profile & Academic Identity
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -1391,7 +1603,7 @@ export default function Home() {
 												<GraduationCap className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
 													Academic & Research Profile
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -1404,14 +1616,6 @@ export default function Home() {
 									</div>
 
 									{/* Section 2 Guideline Notice */}
-									<div className='p-3.5 sm:p-4 rounded-xl bg-sky-50 border border-sky-200/80 text-sky-950 flex items-center gap-2.5 text-xs sm:text-sm font-medium shadow-2xs'>
-										<Info className='w-4 h-4 text-sky-700 flex-shrink-0' />
-										<span>
-											<strong>Important Upload Guideline:</strong> Cadets should only upload the{' '}
-											<strong>first page</strong> of their work in PDF format for all questions in
-											this section.
-										</span>
-									</div>
 
 									{/* Question 8: Current CGPA */}
 									<div id='cgpa' className='section-container space-y-3'>
@@ -1424,7 +1628,7 @@ export default function Home() {
 													{!isFirstYear && <span className='text-red-600 font-bold'>*</span>}
 												</label>
 											</div>
-											<span className='text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200'>
+											<span className='text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200'>
 												{isFirstYear ? 'Exempted for first semester cadets' : 'Mention your CGPA'}
 											</span>
 										</div>
@@ -1470,7 +1674,7 @@ export default function Home() {
 														9. Journal / Book Chapter Publications, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
+												<span className='text-xs text-slate-500 font-medium block mt-1'>
 													Mention Journal / Book chapter details & upload publication proof PDF
 												</span>
 											</div>
@@ -1595,7 +1799,7 @@ export default function Home() {
 														10. Patents / Design Registrations / Copyrights, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
+												<span className='text-xs text-slate-500 font-medium block mt-1'>
 													Mention IPR details & upload certificate / filing document in PDF
 												</span>
 											</div>
@@ -1719,7 +1923,7 @@ export default function Home() {
 														11. Competitions / Hackathons / Technothons, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
+												<span className='text-xs text-slate-500 font-medium block mt-1'>
 													Mention competitions and upload certificate in PDF.
 												</span>
 											</div>
@@ -1857,7 +2061,7 @@ export default function Home() {
 												<Award className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
 													Co-Curricular & Leadership Profile
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -1877,7 +2081,7 @@ export default function Home() {
 														12. Activities / Events if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
+												<span className='text-xs text-slate-500 font-medium block mt-1'>
 													Mention the activity, event, and your role, and upload certificate in PDF
 													.
 												</span>
@@ -2006,7 +2210,7 @@ export default function Home() {
 														13. Participation in Conference / Awards, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
+												<span className='text-xs text-slate-500 font-medium block mt-1'>
 													Mention the conference / award & upload certificate / proof in PDF.
 												</span>
 											</div>
@@ -2139,7 +2343,7 @@ export default function Home() {
 														14. Leadership / Coordinator Positions Held, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
+												<span className='text-xs text-slate-500 font-medium block mt-1'>
 													Mention position, organisation/club/event, duration, and responsibilities
 													held.
 												</span>
@@ -2216,7 +2420,7 @@ export default function Home() {
 												<Lightbulb className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
 													Innovation & Problem-Solving
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -2236,7 +2440,7 @@ export default function Home() {
 												15. What is one Problem in the Indian Maritime University Ecosystem you
 												would like to solve? <span className='text-red-600 font-bold'>*</span>
 											</label>
-											<p className='text-xs text-slate-500 leading-relaxed block mt-1'>
+											<p className='text-xs text-slate-500 font-medium leading-relaxed block mt-1'>
 												Briefly describe the problem and why you think it needs to be addressed.
 											</p>
 										</div>
@@ -2255,7 +2459,7 @@ export default function Home() {
 												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.problemMaritime}
 											</p>
 										)}
-										<div className='flex justify-end text-[11px] text-slate-400 font-mono font-semibold'>
+										<div className='flex justify-end text-xs text-slate-400 font-mono font-semibold'>
 											{formData.problemMaritime.length} characters
 										</div>
 									</div>
@@ -2269,7 +2473,7 @@ export default function Home() {
 												16. What is one Problem in Society you would like to solve?
 												<span className='text-red-600 font-bold'>*</span>
 											</label>
-											<p className='text-xs text-slate-500 leading-relaxed block mt-1'>
+											<p className='text-xs text-slate-500 font-medium leading-relaxed block mt-1'>
 												Briefly describe the problem and why you think it needs to be addressed.
 											</p>
 										</div>
@@ -2288,7 +2492,7 @@ export default function Home() {
 												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.problemSociety}
 											</p>
 										)}
-										<div className='flex justify-end text-[11px] text-slate-400 font-mono font-semibold'>
+										<div className='flex justify-end text-xs text-slate-400 font-mono font-semibold'>
 											{formData.problemSociety.length} characters
 										</div>
 									</div>
@@ -2300,7 +2504,7 @@ export default function Home() {
 												17. Which area(s) of innovation / technology interest you most?{' '}
 												<span className='text-red-600 font-bold'>*</span>
 											</label>
-											<p className='text-xs text-slate-500 mt-1 block'>
+											<p className='text-xs text-slate-500 font-medium mt-1 block'>
 												Select at least 1 innovation domain from below or add custom areas.
 											</p>
 										</div>
@@ -2341,7 +2545,7 @@ export default function Home() {
 													}
 												}}
 												placeholder='Add other specific technology or innovation topic...'
-												className='form-input flex-1 text-xs sm:text-sm'
+												className='form-input flex-1'
 											/>
 											<button
 												type='button'
@@ -2378,7 +2582,7 @@ export default function Home() {
 												<ShieldCheck className='w-5 h-5 text-sky-300' />
 											</div>
 											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide font-heading'>
+												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
 													Supporting Documents & Official Declaration
 												</h2>
 												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
@@ -2403,7 +2607,7 @@ export default function Home() {
 														Recommended
 													</span>
 												</div>
-												<span className='text-xs text-slate-500 block mt-1'>
+												<span className='text-xs text-slate-500 font-medium block mt-1'>
 													Upload your latest CV/resume in PDF format (strongly recommended for
 													council evaluation, or select NIL if not available).
 												</span>
@@ -2521,7 +2725,7 @@ export default function Home() {
 
 										{/* Declaration Statement Box */}
 										<div className='declaration-certificate-box p-5 sm:p-6 text-slate-800 text-xs sm:text-sm leading-relaxed'>
-											<strong className='text-[#0e2544] font-bold block mb-2 uppercase tracking-wide text-xs font-heading'>
+											<strong className='text-[#0e2544] font-bold block mb-2 uppercase tracking-wide text-xs sm:text-sm font-heading'>
 												Declaration Statement:
 											</strong>
 											<p className='italic text-slate-700 leading-relaxed font-medium'>
@@ -2581,6 +2785,19 @@ export default function Home() {
 									</div>
 								</section>
 
+								{/* Submission Error Banner */}
+								{submissionError && (
+									<div className='p-4 sm:p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950 text-xs sm:text-sm space-y-1.5 animate-fadeIn'>
+										<div className='flex items-center gap-2 font-bold text-rose-800'>
+											<AlertCircle className='w-4 h-4 text-rose-600 flex-shrink-0' />
+											<span>Submission Could Not Be Completed</span>
+										</div>
+										<p className='text-rose-900 leading-relaxed font-medium pl-6'>
+											{submissionError}
+										</p>
+									</div>
+								)}
+
 								{/* ======================================================== */}
 								{/* STEP NAVIGATION & SUBMIT CONTROLS */}
 								{/* ======================================================== */}
@@ -2632,7 +2849,7 @@ export default function Home() {
 				</div>
 
 				{/* Footer note */}
-				<p className='text-center text-xs sm:text-sm text-slate-700 md:text-slate-500 font-bold uppercase tracking-wider mt-6 select-none'>
+				<p className='text-center text-xs sm:text-sm text-slate-500 font-bold uppercase tracking-wider mt-6 select-none'>
 					Indian Maritime University • Kolkata Campus • IIC 2026–27
 				</p>
 				<p aria-hidden='true' className='text-center opacity-0'>

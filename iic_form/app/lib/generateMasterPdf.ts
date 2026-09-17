@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, PDFFont } from 'pdf-lib';
 
 export interface CadetFormData {
 	cadetName: string;
@@ -62,6 +62,7 @@ export interface CadetFormData {
 export interface AttachmentItem {
 	name: string;
 	dataUrl: string;
+	type?: string;
 }
 
 function sanitizePdfText(str?: string): string {
@@ -76,7 +77,7 @@ function sanitizePdfText(str?: string): string {
 
 function wrapText(
 	text: string,
-	font: any,
+	font: PDFFont,
 	fontSize: number,
 	maxWidth: number,
 ): string[] {
@@ -489,18 +490,18 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: textDark,
 	});
-	if (formData.marksheetName) {
-		page1.drawText(
-			`[ Marksheet Proof: ${sanitizePdfText(formData.marksheetName)} ]`,
-			{
-				x: leftColX + 250,
-				y,
-				size: 7.5,
-				font: fontItalic,
-				color: green,
-			},
-		);
-	}
+	const marksheetPdfStatus = formData.marksheetDataUrl
+		? 'attached'
+		: formData.yearOfStudy === '1st Year' || formData.semester === 'Semester 1'
+			? 'NIL (Exempted)'
+			: 'NIL';
+	page1.drawText(`Marksheet PDF: ${marksheetPdfStatus}`, {
+		x: leftColX + 240,
+		y,
+		size: 7.5,
+		font: fontBold,
+		color: marksheetPdfStatus === 'attached' ? green : textMuted,
+	});
 
 	// Q9: Journal / Book Chapter
 	y -= 18;
@@ -511,12 +512,16 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: navy,
 	});
-	page1.drawText(formData.hasJournalPub ? 'YES (Attached)' : 'NIL', {
+	const journalPdfStatus =
+		formData.hasJournalPub && (formData.journalFileDataUrl || formData.journalFileName)
+			? 'attached'
+			: 'NIL';
+	page1.drawText(`PDF: ${journalPdfStatus}`, {
 		x: leftColX + 190,
 		y,
 		size: 7.5,
 		font: fontBold,
-		color: formData.hasJournalPub ? green : textMuted,
+		color: journalPdfStatus === 'attached' ? green : textMuted,
 	});
 	if (formData.hasJournalPub && formData.journalDetails) {
 		const pubLines = wrapText(
@@ -546,12 +551,16 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: navy,
 	});
-	page1.drawText(formData.hasPatents ? 'YES (Attached)' : 'NIL', {
+	const patentPdfStatus =
+		formData.hasPatents && (formData.patentFileDataUrl || formData.patentFileName)
+			? 'attached'
+			: 'NIL';
+	page1.drawText(`PDF: ${patentPdfStatus}`, {
 		x: leftColX + 190,
 		y,
 		size: 7.5,
 		font: fontBold,
-		color: formData.hasPatents ? green : textMuted,
+		color: patentPdfStatus === 'attached' ? green : textMuted,
 	});
 	if (formData.hasPatents && formData.patentDetails) {
 		const patLines = wrapText(
@@ -581,12 +590,17 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: navy,
 	});
-	page1.drawText(formData.hasCompetitions ? 'YES (Attached)' : 'NIL', {
+	const compPdfStatus =
+		formData.hasCompetitions &&
+		(formData.competitionFileDataUrl || formData.competitionFileName)
+			? 'attached'
+			: 'NIL';
+	page1.drawText(`PDF: ${compPdfStatus}`, {
 		x: leftColX + 190,
 		y,
 		size: 7.5,
 		font: fontBold,
-		color: formData.hasCompetitions ? green : textMuted,
+		color: compPdfStatus === 'attached' ? green : textMuted,
 	});
 	if (formData.hasCompetitions && formData.competitionDetails) {
 		const compLines = wrapText(
@@ -683,12 +697,16 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: navy,
 	});
-	page2.drawText(formData.hasActivities ? 'YES (Attached)' : 'NIL', {
+	const actPdfStatus =
+		formData.hasActivities && (formData.activityFileDataUrl || formData.activityFileName)
+			? 'attached'
+			: 'NIL';
+	page2.drawText(`PDF: ${actPdfStatus}`, {
 		x: leftColX + 190,
 		y: y2,
 		size: 7.5,
 		font: fontBold,
-		color: formData.hasActivities ? green : textMuted,
+		color: actPdfStatus === 'attached' ? green : textMuted,
 	});
 	if (formData.hasActivities && formData.activityDetails) {
 		const actLines = wrapText(
@@ -718,12 +736,17 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: navy,
 	});
-	page2.drawText(formData.hasAchievements ? 'YES (Attached)' : 'NIL', {
+	const achPdfStatus =
+		formData.hasAchievements &&
+		(formData.achievementFileDataUrl || formData.achievementFileName)
+			? 'attached'
+			: 'NIL';
+	page2.drawText(`PDF: ${achPdfStatus}`, {
 		x: leftColX + 190,
 		y: y2,
 		size: 7.5,
 		font: fontBold,
-		color: formData.hasAchievements ? green : textMuted,
+		color: achPdfStatus === 'attached' ? green : textMuted,
 	});
 	if (formData.hasAchievements && formData.achievementDetails) {
 		const achLines = wrapText(
@@ -753,12 +776,17 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: navy,
 	});
-	page2.drawText(formData.hasLeadership ? 'YES' : 'NIL', {
+	const ldrPdfStatus =
+		formData.hasLeadership &&
+		(formData.leadershipFileDataUrl || formData.leadershipFileName)
+			? 'attached'
+			: 'NIL';
+	page2.drawText(`PDF: ${ldrPdfStatus}`, {
 		x: leftColX + 190,
 		y: y2,
 		size: 7.5,
 		font: fontBold,
-		color: formData.hasLeadership ? green : textMuted,
+		color: ldrPdfStatus === 'attached' ? green : textMuted,
 	});
 	if (formData.hasLeadership && formData.leadershipDetails) {
 		const ldrLines = wrapText(
@@ -909,18 +937,17 @@ export async function generateMasterCombinedPdf(
 		font: fontBold,
 		color: navy,
 	});
-	page2.drawText(
-		formData.hasResume && formData.resumeName
-			? `Uploaded (${formData.resumeName})`
-			: 'NIL',
-		{
-			x: leftColX + 150,
-			y: y2,
-			size: 7.5,
-			font: fontBold,
-			color: formData.hasResume ? green : textMuted,
-		},
-	);
+	const resumePdfStatus =
+		formData.hasResume && (formData.resumeDataUrl || formData.resumeName)
+			? 'attached'
+			: 'NIL';
+	page2.drawText(`PDF: ${resumePdfStatus}`, {
+		x: leftColX + 150,
+		y: y2,
+		size: 7.5,
+		font: fontBold,
+		color: resumePdfStatus === 'attached' ? green : textMuted,
+	});
 
 	// Q19: Declaration Statement Box
 	y2 -= 16;

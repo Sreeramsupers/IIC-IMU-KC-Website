@@ -7,9 +7,9 @@
 :root {
 	color-scheme: light !important;
 
-	/* Font Stacks */
-	--font-heading: var(--font-heading, 'Montserrat'), system-ui, -apple-system, sans-serif;
-	--font-sans: var(--font-sans, 'Inter'), system-ui, -apple-system, sans-serif;
+	/* Font Stacks (CSS variables injected by next/font on <html>) */
+	--font-heading-fallback: 'Montserrat', system-ui, -apple-system, sans-serif;
+	--font-sans-fallback: 'Inter', system-ui, -apple-system, sans-serif;
 
 	/* Radius Scale */
 	--radius-sm: 0.375rem; /* 6px */
@@ -48,7 +48,7 @@ html {
 body {
 	margin: 0;
 	min-height: 100vh;
-	font-family: var(--font-sans);
+	font-family: var(--font-sans, var(--font-sans-fallback));
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	overflow-x: hidden;
@@ -69,7 +69,7 @@ body {
 
 /* Typography Balance Rules (Modern Web Guidance) */
 h1, h2, h3, h4, h5, h6, .font-heading {
-	font-family: var(--font-heading);
+	font-family: var(--font-heading, var(--font-heading-fallback));
 	letter-spacing: -0.015em;
 	text-wrap: balance;
 }
@@ -118,7 +118,7 @@ p, li, label, span {
 
 .main-title {
 	color: #0e2544 !important;
-	font-family: var(--font-heading);
+	font-family: var(--font-heading, var(--font-heading-fallback));
 }
 
 .academic-badge {
@@ -152,7 +152,7 @@ p, li, label, span {
 
 .notice-title {
 	color: #0e2544 !important;
-	font-family: var(--font-heading);
+	font-family: var(--font-heading, var(--font-heading-fallback));
 }
 
 .notice-step-num {
@@ -263,7 +263,7 @@ p, li, label, span {
 	padding-inline: 15px;
 	min-height: 48px;
 	font-size: 1rem;
-	font-family: var(--font-sans);
+	font-family: var(--font-sans, var(--font-sans-fallback));
 	color: #0e2544 !important;
 	line-height: 1.5;
 	transition: border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease;
@@ -433,7 +433,7 @@ select:-webkit-autofill:focus {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	font-family: var(--font-heading);
+	font-family: var(--font-heading, var(--font-heading-fallback));
 	font-weight: 700;
 	font-size: 0.8125rem;
 	letter-spacing: 0.04em;
@@ -473,7 +473,7 @@ select:-webkit-autofill:focus {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	font-family: var(--font-heading);
+	font-family: var(--font-heading, var(--font-heading-fallback));
 	font-weight: 600;
 	font-size: 0.8125rem;
 	letter-spacing: 0.03em;
@@ -504,7 +504,23 @@ select:-webkit-autofill:focus {
 }
 
 /* ==========================================================================
-   4. PRINT & REDUCED MOTION
+   4. MOBILE TYPOGRAPHY OPTIMIZATION
+   ========================================================================== */
+
+/* Headings: tighter line-height on mobile for clean wrapping */
+@media (max-width: 639px) {
+	h1, h2, h3 {
+		line-height: 1.25; /* leading-snug equivalent — prevents loose gaps on 2-line wraps */
+	}
+
+	/* Ultra-narrow phones (<375px): tighter form body padding */
+	.section-container {
+		padding: 1rem;
+	}
+}
+
+/* ==========================================================================
+   5. PRINT & REDUCED MOTION
    ========================================================================== */
 
 @media print {
