@@ -510,12 +510,26 @@ select:-webkit-autofill:focus {
 /* Headings: tighter line-height on mobile for clean wrapping */
 @media (max-width: 639px) {
 	h1, h2, h3 {
-		line-height: 1.25; /* leading-snug equivalent — prevents loose gaps on 2-line wraps */
+		line-height: 1.2; /* leading-tight equivalent — prevents loose gaps on 2-line wraps */
+		letter-spacing: -0.02em;
+	}
+
+	h4, h5, h6 {
+		line-height: 1.3;
 	}
 
 	/* Ultra-narrow phones (<375px): tighter form body padding */
 	.section-container {
-		padding: 1rem;
+		padding: 1rem 0.75rem;
+	}
+
+	.form-label {
+		line-height: 1.4;
+		letter-spacing: 0.01em;
+	}
+
+	.form-hint {
+		line-height: 1.5;
 	}
 }
 
@@ -550,5 +564,15 @@ select:-webkit-autofill:focus {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
+	}
+}
+
+/* Ultra-narrow phones: adjust interest tag chip to prevent excessive wrapping */
+@media (max-width: 374px) {
+	.interest-tag-chip {
+		font-size: 0.75rem; /* Slightly smaller font */
+		padding-block: 6px;
+		padding-inline: 10px;
+		gap: 5px;
 	}
 }

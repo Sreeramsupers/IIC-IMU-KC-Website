@@ -1038,18 +1038,18 @@ export default function Home() {
 	const progressPercent = Math.round((completedCount / 5) * 100);
 
 	return (
-		<main className='relative w-full min-h-screen py-5 sm:py-9 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start nautical-grid-pattern'>
+		<main className='relative w-full min-h-screen py-4 sm:py-9 px-2 sm:px-6 lg:px-8 flex flex-col items-center justify-start nautical-grid-pattern'>
 			{/* Ambient Radial Lighting Overlay */}
 			<div className='pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(2,132,199,0.12),rgba(255,255,255,0))]' />
 
 			{/* Form Shell / Center Card */}
-			<div className='relative z-10 w-full max-w-4xl mb-16 mt-1 sm:mt-2'>
+			<div className='relative z-10 w-full max-w-4xl mb-12 mt-1 sm:mt-2'>
 				<div className='clean-card overflow-hidden'>
 					{/* Top Institutional Accent Line */}
 					<div className='h-1.5 w-full bg-gradient-to-r from-[#0a1e38] via-[#0284c7] to-[#f59e0b]' />
 
 					{/* Official Banner Header with Frame */}
-					<div className='w-full banner-frame-container p-2.5 sm:p-4 flex justify-center'>
+					<div className='w-full banner-frame-container p-2 sm:p-4 flex justify-center'>
 						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden banner-frame-inner'>
 							<Image
 								src='/iic-banner-v5.png'
@@ -1065,19 +1065,19 @@ export default function Home() {
 					</div>
 
 					{/* Title & Official Notice Strip */}
-					<div className='px-6 sm:px-9 py-6 sm:py-7 header-strip'>
+					<div className='px-5 sm:px-9 py-5 sm:py-7 header-strip'>
 						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3.5'>
 							<div>
 								<div className='flex items-center gap-2 mb-1.5 flex-wrap'>
-									<span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold academic-badge shadow-2xs'>
+									<span className='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold academic-badge shadow-2xs'>
 										Academic Year 2026–27
 									</span>
-									<span className='inline-flex items-center gap-1 text-xs font-bold campus-badge uppercase tracking-wider'>
+									<span className='inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold campus-badge uppercase tracking-wider'>
 										<Building2 className='w-3.5 h-3.5 opacity-70' />
-										Indian Maritime University - Kolkata Campus
+										IMU - Kolkata Campus
 									</span>
 								</div>
-								<h1 className='text-xl sm:text-2xl lg:text-[26px] font-black uppercase tracking-tight leading-snug sm:leading-tight main-title font-heading'>
+								<h1 className='text-lg sm:text-2xl lg:text-[26px] font-black uppercase tracking-tight leading-tight main-title font-heading'>
 									Institution’s Innovation Council (IIC) – Cadet Enrollment Form
 								</h1>
 							</div>
@@ -1090,18 +1090,18 @@ export default function Home() {
 
 						{/* Instructions to cadets Banner (Visible only before submission) */}
 						{!submitted && (
-							<div className='mt-5 p-5 sm:p-6 rounded-2xl notice-card'>
+							<div className='mt-5 p-4 sm:p-6 rounded-2xl notice-card'>
 								<div className='flex items-center gap-2.5 pb-3.5 mb-3.5 border-b border-sky-200/50 dark:border-slate-700/60'>
 									<div className='w-7 h-7 rounded-lg notice-header-badge flex items-center justify-center flex-shrink-0 shadow-xs'>
 										<Info className='w-4 h-4' />
 									</div>
-									<h2 className='font-bold uppercase tracking-wider text-xs sm:text-sm notice-title'>
+									<h2 className='font-bold uppercase tracking-wider text-[11px] sm:text-sm notice-title'>
 										Important Notice / Instructions:
 									</h2>
 								</div>
-								<ol className='space-y-3 text-xs sm:text-[13px] leading-relaxed'>
+								<ol className='space-y-2.5 text-[12px] sm:text-[13px] leading-relaxed'>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
+										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
 											1
 										</span>
 										<span className='flex-1 font-medium notice-step-text'>
@@ -1111,7 +1111,7 @@ export default function Home() {
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
+										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
 											2
 										</span>
 										<span className='flex-1 font-medium notice-step-text'>
@@ -1120,7 +1120,7 @@ export default function Home() {
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
+										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
 											3
 										</span>
 										<span className='flex-1 font-medium notice-step-text'>
@@ -1129,7 +1129,7 @@ export default function Home() {
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
+										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
 											4
 										</span>
 										<span className='flex-1 font-medium notice-step-text'>
@@ -1138,7 +1138,7 @@ export default function Home() {
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-5 h-5 rounded-full notice-step-num text-[11px] font-extrabold flex items-center justify-center mt-0.5'>
+										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
 											5
 										</span>
 										<span className='flex-1 font-medium notice-step-text'>
@@ -1203,7 +1203,7 @@ export default function Home() {
 							{/* 5-STEP RESPONSIVE ACCESSIBLE STEPPER (W3C & 21st.dev Standard) */}
 							<nav
 								aria-label='Cadet Enrollment Steps'
-								className='border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-sky-50/20 to-slate-50 px-2 sm:px-6 pt-3.5 pb-3 sm:pt-4 sm:pb-3.5'>
+								className='border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-sky-50/20 to-slate-50 px-2 sm:px-6 pt-2.5 pb-2.5 sm:pt-3.5 sm:pb-2.5'>
 								{/* Top Stepper Track Progress Bar */}
 								<div className='w-full max-w-4xl mx-auto mb-3 px-0.5 sm:px-1'>
 									<div className='h-1 w-full bg-slate-200/80 rounded-full overflow-hidden'>
@@ -1216,7 +1216,7 @@ export default function Home() {
 
 								<ol
 									role='list'
-									className='grid grid-cols-5 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto w-full items-stretch'>
+									className='grid grid-cols-5 gap-1 sm:gap-2.5 max-w-4xl mx-auto w-full items-stretch'>
 									{SECTIONS.map((sec) => {
 										const isCurrent = currentStep === sec.id;
 										const isCompleted = completedSteps.includes(sec.id) && !isCurrent;
