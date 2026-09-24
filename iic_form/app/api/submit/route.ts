@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function sanitizeUrl(rawUrl?: string): string {
 	if (!rawUrl) return '';
@@ -42,10 +43,49 @@ export async function POST(req: NextRequest) {
 
 		const rawUrl =
 			process.env.GOOGLE_SHEET_WEBAPP_URL ||
-			process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL ||
-			'https://script.google.com/macros/s/AKfycbzVklG1gmnnhi1wq6HVMTNr_1XcMADOURNKSJOHFTSDmZzUCPkSQzFWIHslsOIRU3M6/exec';
+			'https://script.google.com/macros/s/AKfycbz7fhNq7uINoqJUu9VCia_D29DHLR7c1JTAHHNHW6LpTows7CQv5E2vlhazsnI37fdX/exec';
 
 		const googleScriptUrl = sanitizeUrl(rawUrl);
+
+		// Read faculty/forward email addresses from backend environment & payload
+		const rawForwardEmails =
+			process.env.FORWARD_EMAILS ||
+			process.env.ADMIN_FORWARD_EMAILS ||
+			process.env.FACULTY_EMAILS ||
+			process.env.FACULTY_EMAIL ||
+			'';
+		const envEmails = rawForwardEmails
+			? rawForwardEmails
+					.split(',')
+					.map((e) => e.trim())
+					.filter((e) => e.includes('@'))
+			: [];
+
+		const payloadRaw = data.forwardEmails || data.facultyEmails || data.facultyEmail;
+		const payloadEmails = Array.isArray(payloadRaw)
+			? payloadRaw
+			: typeof payloadRaw === 'string'
+			? payloadRaw.split(',')
+			: [];
+
+		const combinedEmails = Array.from(
+			new Set(
+				[...envEmails, ...payloadEmails]
+					.map((e: string) => (typeof e === 'string' ? e.trim() : ''))
+					.filter((e: string) => e.includes('@')),
+			),
+		);
+
+		// STRICT: Cadets must never receive emails. Filter out cadet email from forward list.
+		const cadetEmailLower = (data.email || '').toLowerCase().trim();
+		const forwardEmails = combinedEmails.filter(
+			(e) => e.toLowerCase().trim() !== cadetEmailLower,
+		);
+
+		// Fallback to default faculty address if list is empty
+		if (forwardEmails.length === 0) {
+			forwardEmails.push('sreerambhavanspkd@gmail.com');
+		}
 
 		// Next.js Serverless Background Task (Non-Blocking):
 		// Executes Google Drive upload, Doc population, Sheet append, and Email dispatch in background
@@ -68,7 +108,11 @@ export async function POST(req: NextRequest) {
 					body: JSON.stringify({
 						...data,
 						referenceId,
-						templateDocId: data.templateDocId || '1x69S7y0X7UJYR7x2ZEKCoQzPFCb-2nHctp6XNQG3E7I',
+						forwardEmails,
+						templateDocId:
+							process.env.GOOGLE_DOC_TEMPLATE_ID ||
+							data.templateDocId ||
+							'1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw',
 					}),
 					redirect: 'follow',
 				});

@@ -1,17 +1,19 @@
 import type { Metadata } from 'next';
-import { Montserrat, Inter } from 'next/font/google';
+import { Poppins, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
-const montserrat = Montserrat({
+const poppins = Poppins({
 	subsets: ['latin'],
-	variable: '--font-heading',
-	weight: ['500', '600', '700', '800', '900'],
+	variable: '--font-poppins',
+	weight: ['300', '400', '500', '600', '700', '800'],
+	display: 'swap',
 });
 
-const inter = Inter({
+const jetbrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
-	variable: '--font-sans',
-	weight: ['400', '500', '600', '700'],
+	variable: '--font-mono',
+	weight: ['400', '600', '700'],
+	display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -23,6 +25,7 @@ export const metadata: Metadata = {
 		'IIC 2026-27',
 		'Institution Innovation Council',
 		'Cadet Registration',
+		'Skylearn Design System',
 	],
 };
 
@@ -32,7 +35,9 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang='en' className={`${montserrat.variable} ${inter.variable} h-full antialiased`}>
+		<html
+			lang='en'
+			className={`${poppins.variable} ${jetbrainsMono.variable} h-full antialiased`}>
 			<head>
 				<link
 					rel='preload'
@@ -42,7 +47,7 @@ export default function RootLayout({
 					fetchPriority='high'
 				/>
 			</head>
-			<body className='min-h-full bg-[#f3f6fa] text-[#0e2544] flex flex-col font-sans selection:bg-[#0e2544] selection:text-white'>
+			<body className='min-h-full bg-white text-[#0F172A] flex flex-col font-sans selection:bg-[#3B82F6] selection:text-white'>
 				{children}
 			</body>
 		</html>

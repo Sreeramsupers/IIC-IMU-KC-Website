@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, FormEvent, ChangeEvent, FocusEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent, ChangeEvent, FocusEvent } from 'react';
 import Image from 'next/image';
 import confetti from 'canvas-confetti';
 import {
@@ -15,6 +15,8 @@ import {
 	Trash2,
 	ChevronRight,
 	ChevronLeft,
+	ChevronDown,
+	ChevronUp,
 	Sparkles,
 	ShieldCheck,
 	Info,
@@ -43,7 +45,7 @@ export interface FormData {
 	photoName: string;
 	photoDataUrl?: string;
 
-	// Section 2: Academic & Research Profile (Q8 - Q11)
+	// Section 2: Academics Profile (Q8 - Q11)
 	cgpa: string;
 	marksheetStatus: 'combined_pdf' | 'separate_pdf' | 'na_first_year';
 	marksheetName: string;
@@ -162,17 +164,21 @@ const DEPARTMENTS = [
 const ALL_YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 const PG_YEARS = ['1st Year', '2nd Year'];
 
-const ALL_SEMESTERS = [
-	'Semester 1',
-	'Semester 2',
-	'Semester 3',
-	'Semester 4',
-	'Semester 5',
-	'Semester 6',
-	'Semester 7',
-	'Semester 8',
-];
-const PG_SEMESTERS = ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4'];
+export const YEAR_SEMESTER_MAP: Record<string, string[]> = {
+	'1st Year': ['Semester 1', 'Semester 2'],
+	'2nd Year': ['Semester 3', 'Semester 4'],
+	'3rd Year': ['Semester 5', 'Semester 6'],
+	'4th Year': ['Semester 7', 'Semester 8'],
+};
+
+export function getYearFromSemester(semester: string): string {
+	for (const [year, semesters] of Object.entries(YEAR_SEMESTER_MAP)) {
+		if (semesters.includes(semester)) {
+			return year;
+		}
+	}
+	return '1st Year';
+}
 
 const SUGGESTED_INTERESTS = [
 	'🚢 Maritime Robotics, USVs & Autonomous Vessels',
@@ -193,7 +199,7 @@ const SECTIONS = [
 	{ id: 1, title: 'Cadet Profile', shortTitle: 'Profile', icon: User, badge: 'Q1–Q7' },
 	{
 		id: 2,
-		title: 'Academic & Research',
+		title: 'Academics',
 		shortTitle: 'Academic',
 		icon: GraduationCap,
 		badge: 'Q8–Q11',
@@ -214,12 +220,35 @@ export default function Home() {
 	const [submittedRefId, setSubmittedRefId] = useState('');
 	const [draftSaved, setDraftSaved] = useState(false);
 	const [submissionError, setSubmissionError] = useState<string | null>(null);
+	const [noticeExpanded, setNoticeExpanded] = useState(false);
+	const stepButtonsRef = useRef<{ [key: number]: HTMLButtonElement | null }>({});
+	const stepperContainerRef = useRef<HTMLDivElement | null>(null);
+	const stepEnteredAtRef = useRef<number>(Date.now());
+
+	useEffect(() => {
+		stepEnteredAtRef.current = Date.now();
+	}, [currentStep]);
+
+	useEffect(() => {
+		const container = stepperContainerRef.current;
+		const btn = stepButtonsRef.current[currentStep];
+		if (container && btn) {
+			const containerWidth = container.offsetWidth;
+			const btnLeft = btn.offsetLeft;
+			const btnWidth = btn.offsetWidth;
+			const targetLeft = btnLeft - containerWidth / 2 + btnWidth / 2;
+			container.scrollTo({ left: targetLeft, behavior: 'smooth' });
+		}
+	}, [currentStep]);
 
 	const isFirstYear = formData.yearOfStudy === '1st Year' || formData.semester === 'Semester 1';
 	const isPostGraduate =
 		formData.department.includes('MBA') || formData.department.includes('M.Tech');
 	const availableYears = isPostGraduate ? PG_YEARS : ALL_YEARS;
-	const availableSemesters = isPostGraduate ? PG_SEMESTERS : ALL_SEMESTERS;
+	const availableSemesters = YEAR_SEMESTER_MAP[formData.yearOfStudy] || [
+		'Semester 1',
+		'Semester 2',
+	];
 
 	// Load draft from localStorage on mount
 	useEffect(() => {
@@ -227,10 +256,19 @@ export default function Home() {
 			const savedDraft = localStorage.getItem('iic_form_draft_v2');
 			if (savedDraft) {
 				const parsed = JSON.parse(savedDraft);
+				const validSemesters = YEAR_SEMESTER_MAP[parsed.yearOfStudy] || [
+					'Semester 1',
+					'Semester 2',
+				];
+				const syncedSemester = validSemesters.includes(parsed.semester)
+					? parsed.semester
+					: validSemesters[0];
+
 				const timer = setTimeout(() => {
 					setFormData((prev) => ({
 						...prev,
 						...parsed,
+						semester: syncedSemester,
 						photoDataUrl: '',
 						resumeDataUrl: '',
 						marksheetDataUrl: '',
@@ -368,25 +406,62 @@ export default function Home() {
 			const isPG = value.includes('MBA') || value.includes('M.Tech');
 			setFormData((prev) => {
 				let updatedYear = prev.yearOfStudy;
-				let updatedSem = prev.semester;
-
-				if (isPG) {
-					if (updatedYear === '3rd Year' || updatedYear === '4th Year') {
-						updatedYear = '2nd Year';
-					}
-					const semNum = parseInt(updatedSem.replace(/\D/g, ''), 10) || 1;
-					if (semNum > 4) {
-						updatedSem = 'Semester 4';
-					}
+				if (isPG && (updatedYear === '3rd Year' || updatedYear === '4th Year')) {
+					updatedYear = '2nd Year';
 				}
+				const validSemesters = YEAR_SEMESTER_MAP[updatedYear] || ['Semester 1', 'Semester 2'];
+				const updatedSem = validSemesters.includes(prev.semester)
+					? prev.semester
+					: validSemesters[0];
+				const willBeFirstYear = updatedYear === '1st Year' || updatedSem === 'Semester 1';
 
 				return {
 					...prev,
 					department: value,
 					yearOfStudy: updatedYear,
 					semester: updatedSem,
+					...(willBeFirstYear ? { marksheetName: '', marksheetDataUrl: '', cgpa: '' } : {}),
 				};
 			});
+			return;
+		}
+
+		if (name === 'yearOfStudy') {
+			setFormData((prev) => {
+				const validSemesters = YEAR_SEMESTER_MAP[value] || ['Semester 1', 'Semester 2'];
+				const updatedSem = validSemesters.includes(prev.semester)
+					? prev.semester
+					: validSemesters[0];
+				const willBeFirstYear = value === '1st Year' || updatedSem === 'Semester 1';
+
+				return {
+					...prev,
+					yearOfStudy: value,
+					semester: updatedSem,
+					...(willBeFirstYear ? { marksheetName: '', marksheetDataUrl: '', cgpa: '' } : {}),
+				};
+			});
+			if (value === '1st Year') {
+				setErrors((prev) => ({ ...prev, marksheetFile: '', cgpa: '' }));
+			}
+			return;
+		}
+
+		if (name === 'semester') {
+			setFormData((prev) => {
+				const mappedYear = getYearFromSemester(value);
+				const willBeFirstYear = mappedYear === '1st Year' || value === 'Semester 1';
+
+				return {
+					...prev,
+					yearOfStudy: mappedYear,
+					semester: value,
+					...(willBeFirstYear ? { marksheetName: '', marksheetDataUrl: '', cgpa: '' } : {}),
+				};
+			});
+			if (value === 'Semester 1' || getYearFromSemester(value) === '1st Year') {
+				setErrors((prev) => ({ ...prev, marksheetFile: '', cgpa: '' }));
+			}
 			return;
 		}
 
@@ -706,27 +781,47 @@ export default function Home() {
 		}
 		setCurrentStep(targetStep);
 		if (typeof window !== 'undefined') {
-			window.scrollTo({ top: 320, behavior: 'smooth' });
+			const formContainer = document.getElementById('enrollment-form-container');
+			if (formContainer) {
+				const rect = formContainer.getBoundingClientRect();
+				if (rect.top < 0) {
+					formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
+			}
 		}
 	};
 
-	const nextStep = () => {
+	const nextStep = (e?: React.MouseEvent) => {
+		if (e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
 		if (isStepComplete(currentStep)) {
 			setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
 		}
 		if (currentStep < 5) {
 			setCurrentStep((prev) => prev + 1);
 			if (typeof window !== 'undefined') {
-				window.scrollTo({ top: 320, behavior: 'smooth' });
+				const formContainer = document.getElementById('enrollment-form-container');
+				if (formContainer) {
+					formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
 			}
 		}
 	};
 
-	const prevStep = () => {
+	const prevStep = (e?: React.MouseEvent) => {
+		if (e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
 		if (currentStep > 1) {
 			setCurrentStep((prev) => prev - 1);
 			if (typeof window !== 'undefined') {
-				window.scrollTo({ top: 320, behavior: 'smooth' });
+				const formContainer = document.getElementById('enrollment-form-container');
+				if (formContainer) {
+					formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
 			}
 		}
 	};
@@ -741,8 +836,21 @@ export default function Home() {
 		return allValid;
 	};
 
-	const handleSubmit = async (e: FormEvent) => {
-		e.preventDefault();
+	const handleSubmit = async (e?: FormEvent | React.MouseEvent) => {
+		if (e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+		// Strict guard: Submission and validation ONLY exist on Step 5
+		if (currentStep < 5) {
+			return;
+		}
+
+		// Prevent mobile touch ghost clicks / rapid double taps when transitioning from step 4
+		if (Date.now() - stepEnteredAtRef.current < 450) {
+			return;
+		}
+
 		if (!validateAll()) {
 			// Automatically navigate to the first incomplete/invalid step
 			for (let s = 1; s <= 5; s++) {
@@ -753,7 +861,7 @@ export default function Home() {
 			}
 			setTimeout(() => {
 				const firstError = document.querySelector(
-					'.input-error, [id^="cadetName"], [id^="regNumber"], [id^="photo"], [id^="resume"], [id^="declarationAccepted"]',
+					'.input-error, [id^="cadetName"], [id^="regNumber"], [id^="email"], [id^="phone"], [id^="photo"], [id^="cgpa"], [id^="problemMaritime"], [id^="problemSociety"], [id^="areasOfInterest"], [id^="resume"], [id^="declarationAccepted"]',
 				);
 				if (firstError) {
 					firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -838,7 +946,7 @@ export default function Home() {
 
 			// Collect all uploaded proof files for single attachment PDF compilation
 			const attachedProofs: { name: string; type: string; dataUrl: string }[] = [];
-			if (formData.marksheetDataUrl) {
+			if (!isFirstYear && formData.marksheetDataUrl) {
 				attachedProofs.push({
 					name: formData.marksheetName || 'Semester_Marksheet.pdf',
 					type: 'marksheet',
@@ -908,12 +1016,23 @@ export default function Home() {
 				console.warn('Could not compile local master PDF:', pdfErr);
 			}
 
+			// Faculty forwarding email list
+			const rawFacultyEmails =
+				process.env.NEXT_PUBLIC_FACULTY_EMAILS ||
+				process.env.NEXT_PUBLIC_FORWARD_EMAILS ||
+				'sreerambhavanspkd@gmail.com';
+			const forwardEmails = rawFacultyEmails
+				.split(',')
+				.map((e) => e.trim())
+				.filter((e) => e.includes('@'));
+
 			// Streamlined payload: send masterPdfDataUrl without duplicating raw proof arrays
 			const payload = {
 				...formData,
 				referenceId: generatedRefId,
 				submittedAt: new Date().toISOString(),
-				templateDocId: '1x69S7y0X7UJYR7x2ZEKCoQzPFCb-2nHctp6XNQG3E7I',
+				templateDocId: '1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw',
+				forwardEmails,
 
 				// Computed PDF status variables for template
 				marksheet_pdf,
@@ -994,7 +1113,7 @@ export default function Home() {
 						particleCount: 130,
 						spread: 85,
 						origin: { y: 0.6 },
-						colors: ['#0e2544', '#0284c7', '#f59e0b', '#10b981', '#6366f1'],
+						colors: ['#3B82F6', '#FBBF24', '#22C55E', '#A855F7', '#60A5FA'],
 					});
 				} catch {
 					// Ignore confetti error
@@ -1038,19 +1157,19 @@ export default function Home() {
 	const progressPercent = Math.round((completedCount / 5) * 100);
 
 	return (
-		<main className='relative w-full min-h-screen py-4 sm:py-9 px-2 sm:px-6 lg:px-8 flex flex-col items-center justify-start nautical-grid-pattern'>
+		<main className='relative w-full min-h-screen py-6 sm:py-12 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start skylearn-pattern bg-white'>
 			{/* Ambient Radial Lighting Overlay */}
-			<div className='pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(2,132,199,0.12),rgba(255,255,255,0))]' />
+			<div className='pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(59,130,246,0.1),rgba(255,255,255,0))]' />
 
-			{/* Form Shell / Center Card */}
-			<div className='relative z-10 w-full max-w-4xl mb-12 mt-1 sm:mt-2'>
+			{/* Form Shell / Center Card (Max-w-5xl, 28px Radius) */}
+			<div className='relative z-10 w-full max-w-5xl mb-12 mt-1 sm:mt-2'>
 				<div className='clean-card overflow-hidden'>
-					{/* Top Institutional Accent Line */}
-					<div className='h-1.5 w-full bg-gradient-to-r from-[#0a1e38] via-[#0284c7] to-[#f59e0b]' />
+					{/* Skylearn Brand Accent Bar: Sky, Sun & Leaf */}
+					<div className='h-2 w-full bg-gradient-to-r from-[#3B82F6] via-[#FBBF24] to-[#22C55E]' />
 
 					{/* Official Banner Header with Frame */}
-					<div className='w-full banner-frame-container p-2 sm:p-4 flex justify-center'>
-						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden banner-frame-inner'>
+					<div className='w-full banner-frame-container p-2 sm:p-5 flex justify-center'>
+						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden banner-frame-inner bg-white'>
 							<Image
 								src='/iic-banner-v5.png'
 								alt='IMU Kolkata Campus - Institution Innovation Council (IIC) 2026-27'
@@ -1058,93 +1177,85 @@ export default function Home() {
 								height={600}
 								priority
 								fetchPriority='high'
-								className='w-full h-auto object-contain mx-auto transition-all'
+								className='w-full h-auto object-contain mx-auto transition-all scale-[1.03] sm:scale-100 py-1 sm:py-0'
 								sizes='(max-width: 1024px) 100vw, 1024px'
 							/>
 						</div>
 					</div>
 
 					{/* Title & Official Notice Strip */}
-					<div className='px-5 sm:px-9 py-5 sm:py-7 header-strip'>
-						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3.5'>
+					<div className='px-4 sm:px-10 py-5 sm:py-8 header-strip'>
+						<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
 							<div>
-								<div className='flex items-center gap-2 mb-1.5 flex-wrap'>
-									<span className='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold academic-badge shadow-2xs'>
+								<div className='flex items-center gap-2 mb-2 flex-wrap'>
+									<span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold academic-badge shadow-xs'>
 										Academic Year 2026–27
 									</span>
-									<span className='inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold campus-badge uppercase tracking-wider'>
-										<Building2 className='w-3.5 h-3.5 opacity-70' />
+									<span className='inline-flex items-center gap-1 text-xs sm:text-sm font-bold campus-badge uppercase tracking-wider'>
+										<Building2 className='w-4 h-4 opacity-75 text-[#3B82F6]' />
 										IMU - Kolkata Campus
 									</span>
 								</div>
-								<h1 className='text-lg sm:text-2xl lg:text-[26px] font-black uppercase tracking-tight leading-tight main-title font-heading'>
+								<h1 className='text-base sm:text-2xl lg:text-[28px] font-extrabold uppercase tracking-tight leading-tight main-title font-heading'>
 									Institution’s Innovation Council (IIC) – Cadet Enrollment Form
 								</h1>
 							</div>
 							{draftSaved && (
-								<div className='flex items-center gap-1.5 text-xs draft-badge px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-2xs animate-fadeIn'>
-									<Check className='w-3.5 h-3.5 text-emerald-600' /> Auto-saved
+								<div className='inline-flex items-center gap-2 text-xs sm:text-sm draft-badge px-3.5 py-1.5 rounded-full font-bold whitespace-nowrap flex-shrink-0 self-start sm:self-auto shadow-xs animate-fadeIn'>
+									<Check className='w-4 h-4 text-[#16A34A] flex-shrink-0' />
+									<span className='whitespace-nowrap'>Auto-Saved</span>
 								</div>
 							)}
 						</div>
 
-						{/* Instructions to cadets Banner (Visible only before submission) */}
+						{/* Instructions to Cadets Banner (Visible only before submission) */}
 						{!submitted && (
 							<div className='mt-5 p-4 sm:p-6 rounded-2xl notice-card'>
-								<div className='flex items-center gap-2.5 pb-3.5 mb-3.5 border-b border-sky-200/50 dark:border-slate-700/60'>
-									<div className='w-7 h-7 rounded-lg notice-header-badge flex items-center justify-center flex-shrink-0 shadow-xs'>
-										<Info className='w-4 h-4' />
+								<div className='flex items-center justify-between gap-3 pb-3 sm:pb-3.5 sm:mb-3 sm:border-b sm:border-[#DBEAFE]'>
+									<div className='flex items-center gap-2.5 min-w-0'>
+										<div className='w-7 h-7 sm:w-8 sm:h-8 rounded-xl notice-header-badge flex items-center justify-center flex-shrink-0 shadow-xs'>
+											<Info className='w-4 h-4' />
+										</div>
+										<h2 className='font-bold uppercase tracking-wider text-sm sm:text-base notice-title truncate'>
+											Instructions
+										</h2>
 									</div>
-									<h2 className='font-bold uppercase tracking-wider text-[11px] sm:text-sm notice-title'>
-										Important Notice / Instructions:
-									</h2>
+									<button
+										type='button'
+										onClick={() => setNoticeExpanded(!noticeExpanded)}
+										className='sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#DBEAFE] text-[#1D4ED8] text-xs font-bold hover:bg-[#BFDBFE] transition-all cursor-pointer'>
+										{noticeExpanded ? (
+											<>
+												<span>Hide</span>
+												<ChevronUp className='w-3.5 h-3.5' />
+											</>
+										) : (
+											<>
+												<span>View</span>
+												<ChevronDown className='w-3.5 h-3.5' />
+											</>
+										)}
+									</button>
 								</div>
-								<ol className='space-y-2.5 text-[12px] sm:text-[13px] leading-relaxed'>
+								<ol
+									className={`space-y-3 text-sm sm:text-base leading-relaxed pt-2 sm:pt-0 border-t border-[#DBEAFE] sm:border-t-0 ${noticeExpanded ? 'block' : 'hidden sm:block'}`}>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
+										<span className='flex-shrink-0 w-6 h-6 rounded-full notice-step-num text-xs font-extrabold flex items-center justify-center mt-0.5'>
 											1
 										</span>
 										<span className='flex-1 font-medium notice-step-text'>
 											Fields marked with an asterisk (
-											<span className='text-rose-500 font-extrabold'>*</span>) are mandatory and
-											must be completed.
+											<span className='text-[#F87171] font-bold'>*</span>) are mandatory and must be
+											completed.
 										</span>
 									</li>
 									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
+										<span className='flex-shrink-0 w-6 h-6 rounded-full notice-step-num text-xs font-extrabold flex items-center justify-center mt-0.5'>
 											2
 										</span>
 										<span className='flex-1 font-medium notice-step-text'>
 											Cadets are advised to ensure that all information provided is accurate,
 											complete, and supported by valid documents before submission.
-										</span>
-									</li>
-									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
-											3
-										</span>
-										<span className='flex-1 font-medium notice-step-text'>
-											The Enrollment Form and all supporting documents/proofs submitted will be
-											compiled into a single PDF and sent to the registered email ID.
-										</span>
-									</li>
-									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
-											4
-										</span>
-										<span className='flex-1 font-medium notice-step-text'>
-											Cadets are required to verify all their details and entries made in the PDF
-											received through their registered email ID.
-										</span>
-									</li>
-									<li className='flex items-start gap-3'>
-										<span className='flex-shrink-0 w-4 sm:w-5 h-4 sm:h-5 rounded-full notice-step-num text-[10px] sm:text-[12px] font-extrabold flex items-center justify-center mt-0.5'>
-											5
-										</span>
-										<span className='flex-1 font-medium notice-step-text'>
-											After verification, sign in the space provided and self-attest the
-											PDF/documents, and submit the duly verified documents in person to the
-											concerned Faculty In-charge.
 										</span>
 									</li>
 								</ol>
@@ -1155,35 +1266,52 @@ export default function Home() {
 					{/* SUCCESS CONFIRMATION VIEW */}
 					{submitted ? (
 						<div className='p-8 sm:p-14 text-center bg-white space-y-6 animate-fadeIn max-w-2xl mx-auto'>
-							<div className='w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center mx-auto text-4xl shadow-lg shadow-emerald-500/20'>
+							<div className='w-20 h-20 rounded-full bg-[#22C55E] text-white flex items-center justify-center mx-auto text-4xl shadow-lg shadow-[#22C55E]/30'>
 								<Check className='w-10 h-10 stroke-[2.5]' />
 							</div>
 							<div className='space-y-3'>
-								<span className='inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100/90 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs'>
-									<CheckCircle2 className='w-3.5 h-3.5 text-emerald-700' /> Application Submitted
+								<span className='inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#166534] uppercase tracking-widest bg-[#DCFCE7] px-4 py-1.5 rounded-full border border-[#86EFAC] shadow-xs'>
+									<CheckCircle2 className='w-4 h-4 text-[#16A34A]' /> Application Submitted
 								</span>
-								<h2 className='text-2xl sm:text-3xl font-extrabold text-[#0e2544] uppercase tracking-tight leading-snug sm:leading-tight font-heading'>
+								<h2 className='text-2xl sm:text-3xl font-extrabold text-[#0F172A] uppercase tracking-tight leading-snug sm:leading-tight font-heading'>
 									Enrollment Form Submitted Successfully!
 								</h2>
-								<p className='text-sm sm:text-base text-slate-600 max-w-lg mx-auto leading-relaxed'>
-									Thank you, <span className='font-bold text-[#0e2544]'>{formData.cadetName}</span>.
+								<p className='text-base text-[#475569] max-w-lg mx-auto leading-relaxed'>
+									Thank you, <span className='font-bold text-[#0F172A]'>{formData.cadetName}</span>.
 									Your enrollment application for the{' '}
 									<strong>Institution’s Innovation Council (IIC 2026–27)</strong> has been recorded.
 								</p>
 
-								{/* Reference ID Card */}
-								<div className='p-4 rounded-xl bg-slate-50 border border-slate-200 max-w-md mx-auto text-left space-y-1 text-xs sm:text-sm text-slate-700'>
-									<p>
-										<strong>Application Ref ID:</strong>{' '}
-										<span className='font-mono font-bold text-[#0284c7]'>{submittedRefId}</span>
-									</p>
-									<p>
-										<strong>Registered Email:</strong>{' '}
-										<span className='font-semibold'>{formData.email}</span>
-									</p>
-									<p className='text-xs text-slate-500 pt-1'>
-										A confirmation email with your compiled single-attachment PDF has been dispatched.
-									</p>
+								{/* Official WhatsApp Group Join Card */}
+								<div className='p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-[#F0FDF4] to-[#DCFCE7]/40 border-2 border-[#86EFAC] max-w-md mx-auto text-center space-y-3.5 shadow-sm animate-fadeIn'>
+									<div className='w-12 h-12 mx-auto rounded-2xl bg-[#25D366] flex items-center justify-center text-white shadow-md shadow-[#25D366]/20'>
+										<svg
+											className='w-7 h-7 fill-current'
+											viewBox='0 0 24 24'
+											xmlns='http://www.w3.org/2000/svg'>
+											<path d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z' />
+										</svg>
+									</div>
+									<div className='space-y-1'>
+										<h3 className='font-extrabold text-[#0F172A] text-base sm:text-lg uppercase tracking-tight'>
+											Join Official Cadet WhatsApp Group
+										</h3>
+										<p className='text-xs sm:text-sm text-[#475569] leading-relaxed'>
+											Connect directly with the council team and stay updated on interview
+											schedules, orientation sessions, and announcements.
+										</p>
+									</div>
+									<a
+										href={
+											process.env.NEXT_PUBLIC_WHATSAPP_GROUP_URL ||
+											'https://chat.whatsapp.com/YOUR_GROUP_INVITE_LINK_HERE'
+										}
+										target='_blank'
+										rel='noopener noreferrer'
+										className='inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl font-bold text-sm sm:text-base text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] transition-all shadow-md shadow-[#25D366]/25 border-b-4 border-[#16A34A] active:border-b-0'>
+										<span>Join IIC WhatsApp Group</span>
+										<ChevronRight className='w-4 h-4' />
+									</a>
 								</div>
 
 								{/* Action Buttons */}
@@ -1191,7 +1319,7 @@ export default function Home() {
 									<button
 										type='button'
 										onClick={handleReset}
-										className='btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-xs sm:text-sm'>
+										className='btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl font-bold text-sm'>
 										<RotateCcw className='w-4 h-4' /> Submit Another Form
 									</button>
 								</div>
@@ -1199,116 +1327,174 @@ export default function Home() {
 						</div>
 					) : (
 						/* MAIN ENROLLMENT FORM */
-						<form onSubmit={handleSubmit} noValidate className='bg-white'>
-							{/* 5-STEP RESPONSIVE ACCESSIBLE STEPPER (W3C & 21st.dev Standard) */}
+						<form
+							id='enrollment-form-container'
+							onSubmit={(e) => {
+								e.preventDefault();
+								if (currentStep === 5) {
+									handleSubmit(e);
+								}
+							}}
+							noValidate
+							className='bg-white'>
+							{/* 5-STEP RESPONSIVE ACCESSIBLE STEPPER (56px Minimum Tap Target Friendly) */}
 							<nav
 								aria-label='Cadet Enrollment Steps'
-								className='border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-sky-50/20 to-slate-50 px-2 sm:px-6 pt-2.5 pb-2.5 sm:pt-3.5 sm:pb-2.5'>
-								{/* Top Stepper Track Progress Bar */}
-								<div className='w-full max-w-4xl mx-auto mb-3 px-0.5 sm:px-1'>
-									<div className='h-1 w-full bg-slate-200/80 rounded-full overflow-hidden'>
-										<div
-											className='h-full bg-gradient-to-r from-[#0e2544] via-[#0284c7] to-emerald-500 transition-all duration-300 ease-out'
-											style={{ width: `${Math.max(12, ((currentStep - 1) / 4) * 100)}%` }}
-										/>
-									</div>
-								</div>
+								className='border-b border-[#E2E8F0] bg-[#F8FAFC] px-3 sm:px-8 py-3 sm:py-4'>
+								<div className='w-full max-w-5xl mx-auto'>
+									{/* Horizontal Touch-Scrollable Chips on Mobile, 5-Col Grid on Desktop */}
+									<div
+										ref={stepperContainerRef}
+										role='tablist'
+										aria-label='Enrollment Form Sections'
+										className='flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1 px-0.5 sm:grid sm:grid-cols-5 sm:gap-3 w-full'>
+										{SECTIONS.map((sec) => {
+											const isCurrent = currentStep === sec.id;
+											const isCompleted = completedSteps.includes(sec.id) && !isCurrent;
+											const StepIcon = sec.icon;
 
-								<ol
-									role='list'
-									className='grid grid-cols-5 gap-1 sm:gap-2.5 max-w-4xl mx-auto w-full items-stretch'>
-									{SECTIONS.map((sec) => {
-										const isCurrent = currentStep === sec.id;
-										const isCompleted = completedSteps.includes(sec.id) && !isCurrent;
-
-										return (
-											<li key={sec.id} className='list-none flex'>
+											return (
 												<button
+													key={sec.id}
 													type='button'
+													role='tab'
+													ref={(el) => {
+														stepButtonsRef.current[sec.id] = el;
+													}}
 													onClick={() => handleStepClick(sec.id)}
-													aria-current={isCurrent ? 'step' : undefined}
+													aria-selected={isCurrent}
 													aria-label={`Step ${sec.id}: ${sec.title} (${isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Pending'})`}
-													title={
+													title={`Go to Step ${sec.id}: ${sec.title}`}
+													className={`group relative flex-shrink-0 sm:flex-shrink min-h-[56px] h-14 px-3 sm:px-2 rounded-2xl flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer touch-manipulation select-none active:scale-95 focus-visible:ring-3 focus-visible:ring-[#3B82F6] focus-visible:outline-none ${
 														isCurrent
-															? `Current Section: ${sec.title}`
+															? 'bg-[#3B82F6] text-white shadow-md ring-2 ring-[#60A5FA] font-black'
 															: isCompleted
-																? `${sec.title} (Completed)`
-																: `${sec.title}`
-													}
-													className={`group relative w-full h-11 sm:h-12 flex items-center justify-center gap-1.5 sm:gap-2 px-1 sm:px-3 rounded-full text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:outline-none ${
-														isCurrent
-															? 'bg-gradient-to-r from-[#0e2544] to-[#163866] text-white shadow-sm ring-2 ring-sky-400/50'
-															: isCompleted
-																? 'bg-emerald-50 text-emerald-950 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
-																: 'bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
+																? 'bg-[#DCFCE7] text-[#166534] border border-[#86EFAC] hover:bg-[#BBF7D0] shadow-xs'
+																: 'bg-white text-[#475569] border border-[#E2E8F0] hover:bg-[#F8FAFC] hover:border-[#94A3B8] shadow-xs'
 													}`}>
+													{/* Step Number or Check Badge */}
 													<div
-														className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 transition-transform ${
+														className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 pointer-events-none transition-transform ${
 															isCurrent
-																? 'bg-sky-400 text-[#0e2544] shadow-xs'
+																? 'bg-[#FBBF24] text-[#0F172A] shadow-xs'
 																: isCompleted
-																	? 'bg-emerald-600 text-white'
-																	: 'bg-slate-200 text-slate-600'
+																	? 'bg-[#22C55E] text-white'
+																	: 'bg-[#E2E8F0] text-[#475569] group-hover:bg-[#CBD5E1]'
 														}`}>
-														{isCompleted ? <Check className='w-3 h-3 stroke-[2.5]' /> : sec.id}
+														{isCompleted ? <Check className='w-3.5 h-3.5 stroke-[2.5]' /> : sec.id}
 													</div>
 
-													<span className='truncate text-[11px] sm:text-xs tracking-tight text-center font-semibold sm:font-bold'>
+													{/* Section Icon (Tablet & Desktop) */}
+													<StepIcon
+														className={`w-4 h-4 hidden md:block flex-shrink-0 pointer-events-none ${
+															isCurrent
+																? 'text-[#DBEAFE]'
+																: isCompleted
+																	? 'text-[#16A34A]'
+																	: 'text-[#94A3B8]'
+														}`}
+													/>
+
+													{/* Section Title */}
+													<span className='whitespace-nowrap tracking-tight font-bold pointer-events-none'>
 														<span className='sm:hidden'>{sec.shortTitle}</span>
-														<span className='hidden sm:inline'>{sec.title}</span>
+														<span className='hidden sm:inline lg:hidden'>{sec.shortTitle}</span>
+														<span className='hidden lg:inline'>{sec.title}</span>
 													</span>
 												</button>
-											</li>
-										);
-									})}
-								</ol>
+											);
+										})}
+									</div>
 
-								{/* Progress Completion Indicator */}
-								<div className='flex items-center justify-between text-xs text-slate-500 font-semibold mt-2.5 px-1 max-w-4xl mx-auto'>
-									<span className='flex items-center gap-1.5'>
-										<Compass className='w-3.5 h-3.5 text-sky-600' />
-										Step {currentStep} of 5 • {SECTIONS[currentStep - 1]?.title}
-									</span>
-									<span className='font-bold text-[#0e2544]'>
-										{progressPercent}% Complete ({completedCount}/5 Steps Completed)
-									</span>
+									{/* Skylearn 8px Animated Progress Bar */}
+									<div
+										className='w-full skylearn-progress-track mt-3 overflow-hidden'
+										role='progressbar'
+										aria-valuenow={progressPercent}
+										aria-valuemin={0}
+										aria-valuemax={100}
+										aria-label='Application progress'>
+										<div
+											className='skylearn-progress-fill'
+											style={{ width: `${progressPercent}%` }}
+										/>
+									</div>
+
+									{/* Status Info Strip */}
+									<div className='flex items-center justify-between text-xs sm:text-sm text-[#475569] font-semibold mt-2 px-1 pt-1.5 border-t border-[#E2E8F0]'>
+										<span className='flex items-center gap-2 min-w-0'>
+											<Compass className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
+											<span className='truncate'>
+												Step {currentStep} of 5:{' '}
+												<strong className='text-[#0F172A]'>
+													{SECTIONS[currentStep - 1]?.title}
+												</strong>
+											</span>
+										</span>
+										<div className='flex items-center gap-2 flex-shrink-0'>
+											{currentStep > 1 && (
+												<button
+													type='button'
+													onClick={() => handleStepClick(currentStep - 1)}
+													className='sm:hidden px-2.5 py-1 rounded-lg bg-white text-[#0F172A] text-xs font-bold border border-[#CBD5E1] hover:bg-slate-50'>
+													‹ Prev
+												</button>
+											)}
+											{currentStep < 5 && (
+												<button
+													type='button'
+													onClick={() => handleStepClick(currentStep + 1)}
+													className='sm:hidden px-2.5 py-1 rounded-lg bg-[#DBEAFE] text-[#1D4ED8] text-xs font-bold border border-[#BFDBFE] hover:bg-[#BFDBFE]'>
+													Next ›
+												</button>
+											)}
+											<span className='font-bold text-[#3B82F6] ml-1'>{completedCount}/5 Done</span>
+										</div>
+									</div>
 								</div>
 							</nav>
 
 							{/* FORM BODY CONTAINER */}
-							<div className='p-6 sm:p-9 lg:p-10 space-y-8'>
+							<div className='p-5 sm:p-10 lg:p-12 space-y-8 sm:space-y-12'>
 								{/* ======================================================== */}
 								{/* SECTION 1: CADET PROFILE & DEMOGRAPHICS (Q1 - Q7 + PHOTO) */}
 								{/* ======================================================== */}
 								<section
 									id='section-1'
-									className={`space-y-7 ${currentStep === 1 ? 'block animate-fadeIn' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
-										<div className='flex items-center gap-3'>
-											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												<User className='w-5 h-5 text-sky-300' />
+									className={`space-y-8 sm:space-y-10 ${currentStep === 1 ? 'block animate-fadeIn' : 'hidden'}`}>
+									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
+										<div className='flex items-start sm:items-center justify-between gap-4'>
+											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
+												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<User className='w-6 h-6 text-white flex-shrink-0' />
+												</div>
+												<div className='min-w-0 flex-1'>
+													<div className='sm:hidden mb-1.5'>
+														<span className='section-badge text-xs py-1 px-3'>Section 1 of 5</span>
+													</div>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+														Cadet Profile & Academic Identity
+													</h2>
+													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
+														Questions 1 to 7 • Personal, enrollment, and official contact details
+													</p>
+												</div>
 											</div>
-											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
-													Cadet Profile & Academic Identity
-												</h2>
-												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 1 to 7 • Personal, enrollment, and official contact details
-												</p>
-											</div>
+											<span className='section-badge hidden sm:inline-flex flex-shrink-0'>
+												Section 1 of 5
+											</span>
 										</div>
-										<span className='section-badge'>Section 1 of 5</span>
 									</div>
 
 									{/* Row 1: 1. Name of Cadet & 2. Department / Academic Program */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div id='cadetName' className='space-y-1.5'>
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8'>
+										<div id='cadetName' className='space-y-1.5 sm:space-y-2'>
 											<label
 												htmlFor='cadetNameInput'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<User className='w-3.5 h-3.5 text-sky-700' />
+												className='flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												<User className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
 												<span>1. Name of the Cadet</span>
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
 											<input
 												type='text'
@@ -1322,36 +1508,36 @@ export default function Home() {
 												autoComplete='name'
 											/>
 											{errors.cadetName && touched.cadetName ? (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+												<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1 sm:mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.cadetName}
 												</p>
 											) : (
-												<p className='text-xs text-slate-500 mt-1 font-medium'>
+												<p className='text-xs sm:text-sm text-[#475569] mt-1 sm:mt-1.5 font-medium'>
 													Enter full name as per official IMU records.
 												</p>
 											)}
 										</div>
-										<div id='department' className='space-y-1.5'>
+										<div id='department' className='space-y-1.5 sm:space-y-2'>
 											<label
 												htmlFor='department'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<Building2 className='w-3.5 h-3.5 text-sky-700' />
+												className='flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												<Building2 className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
 												<span>2. Department / Academic Program</span>
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
 											<select
 												id='department'
 												name='department'
 												value={formData.department}
 												onChange={handleChange}
-												className='form-input cursor-pointer font-medium h-[46px]'>
+												className='form-input cursor-pointer font-medium'>
 												{DEPARTMENTS.map((dept) => (
 													<option key={dept} value={dept}>
 														{dept}
 													</option>
 												))}
 											</select>
-											<p className='text-xs text-slate-500 mt-1 font-medium'>
+											<p className='text-xs sm:text-sm text-[#475569] mt-1 sm:mt-1.5 font-medium'>
 												{isPostGraduate
 													? '2-Year Postgraduate (PG) Program'
 													: '4-Year Undergraduate (UG) Program'}
@@ -1360,68 +1546,68 @@ export default function Home() {
 									</div>
 
 									{/* Row 2: 3. Year of Study & 4. Current Semester */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div id='yearOfStudy' className='space-y-1.5'>
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8'>
+										<div id='yearOfStudy' className='space-y-1.5 sm:space-y-2'>
 											<label
 												htmlFor='yearOfStudySelect'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<Calendar className='w-3.5 h-3.5 text-sky-700' />
+												className='flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												<Calendar className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
 												<span>3. Year of Study</span>
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
 											<select
 												id='yearOfStudySelect'
 												name='yearOfStudy'
 												value={formData.yearOfStudy}
 												onChange={handleChange}
-												className='form-input cursor-pointer font-medium h-[46px]'>
+												className='form-input cursor-pointer font-medium'>
 												{availableYears.map((yr) => (
 													<option key={yr} value={yr}>
 														{yr}
 													</option>
 												))}
 											</select>
-											<p className='text-xs text-slate-500 mt-1 font-medium'>
+											<p className='text-xs sm:text-sm text-[#475569] mt-1 sm:mt-1.5 font-medium'>
 												Select your current academic batch.
 											</p>
 										</div>
-										<div id='semester' className='space-y-1.5'>
+										<div id='semester' className='space-y-1.5 sm:space-y-2'>
 											<label
 												htmlFor='semesterSelect'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<GraduationCap className='w-3.5 h-3.5 text-sky-700' />
+												className='flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												<GraduationCap className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
 												<span>4. Current Semester</span>
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
 											<select
 												id='semesterSelect'
 												name='semester'
 												value={formData.semester}
 												onChange={handleChange}
-												className='form-input cursor-pointer font-medium h-[46px]'>
+												className='form-input cursor-pointer font-medium'>
 												{availableSemesters.map((sem) => (
 													<option key={sem} value={sem}>
 														{sem}
 													</option>
 												))}
 											</select>
-											<p className='text-xs text-slate-500 mt-1 font-medium'>
-												Select ongoing semester.
+											<p className='text-xs sm:text-sm text-[#475569] mt-1 sm:mt-1.5 font-medium'>
+												Select your current semester of study.
 											</p>
 										</div>
 									</div>
 
 									{/* Row 3: 5. Reg No / Roll No & Gender */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start'>
-										<div id='regNumber' className='space-y-1.5'>
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8 items-start'>
+										<div id='regNumber' className='space-y-1.5 sm:space-y-2'>
 											<label
 												htmlFor='regNumberInput'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<Hash className='w-3.5 h-3.5 text-sky-700' />
+												className='flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												<Hash className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
 												<span>
 													5. {isFirstYear ? 'Reg No. / Roll No.' : 'University Reg No. / Roll No.'}
 												</span>
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
 											<input
 												type='text'
@@ -1438,29 +1624,29 @@ export default function Home() {
 												className={`form-input font-mono ${errors.regNumber && touched.regNumber ? 'input-error' : ''}`}
 											/>
 											{errors.regNumber && touched.regNumber ? (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+												<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1 sm:mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.regNumber}
 												</p>
 											) : (
-												<p className='text-xs text-slate-500 mt-1 font-medium'>
+												<p className='text-xs sm:text-sm text-[#475569] mt-1 sm:mt-1.5 font-medium'>
 													{isFirstYear
 														? 'First-year cadets enter your registration number / roll number.'
 														: 'Enter your permanent university registration number / roll number.'}
 												</p>
 											)}
 										</div>
-										<div className='space-y-1.5'>
-											<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												Gender <span className='text-red-600 font-bold'>*</span>
+										<div className='space-y-1.5 sm:space-y-2'>
+											<label className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												Gender <span className='text-[#F87171] font-bold'>*</span>
 											</label>
-											<div className='flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200/90 h-[46px]'>
+											<div className='flex items-center gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0] min-h-[48px] sm:min-h-[56px]'>
 												{['Male', 'Female'].map((g) => (
 													<label
 														key={g}
-														className={`flex-1 text-center h-full flex items-center justify-center rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer touch-manipulation transition-all ${
+														className={`flex-1 text-center h-full min-h-[38px] sm:min-h-[44px] flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer touch-manipulation transition-all ${
 															formData.gender === g
-																? 'bg-[#0e2544] text-white shadow-xs'
-																: 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/70'
+																? 'bg-[#3B82F6] text-white shadow-xs'
+																: 'text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F5F9]'
 														}`}>
 														<input
 															type='radio'
@@ -1478,14 +1664,14 @@ export default function Home() {
 									</div>
 
 									{/* Row 4: 6. Email Address & 7. Mobile Number */}
-									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6'>
-										<div id='email' className='space-y-1.5'>
+									<div className='grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8'>
+										<div id='email' className='space-y-1.5 sm:space-y-2'>
 											<label
 												htmlFor='emailInput'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<Mail className='w-3.5 h-3.5 text-sky-700' />
+												className='flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												<Mail className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
 												<span>6. Email Address</span>
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
 											<input
 												type='email'
@@ -1499,19 +1685,19 @@ export default function Home() {
 												autoComplete='email'
 											/>
 											{errors.email && touched.email && (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+												<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1 sm:mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.email}
 												</p>
 											)}
 										</div>
 
-										<div id='phone' className='space-y-1.5'>
+										<div id='phone' className='space-y-1.5 sm:space-y-2'>
 											<label
 												htmlFor='phoneInput'
-												className='flex items-center gap-1.5 text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
-												<Phone className='w-3.5 h-3.5 text-sky-700' />
+												className='flex items-center gap-2 text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
+												<Phone className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
 												<span>7. Mobile Number</span>
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
 											<input
 												type='tel'
@@ -1525,7 +1711,7 @@ export default function Home() {
 												autoComplete='tel'
 											/>
 											{errors.phone && touched.phone && (
-												<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+												<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1 sm:mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 													<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.phone}
 												</p>
 											)}
@@ -1535,33 +1721,33 @@ export default function Home() {
 									{/* Passport Size Photo Upload */}
 									<div
 										id='photo'
-										className='p-5 sm:p-6 rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50 via-sky-50/20 to-slate-50 shadow-2xs'>
+										className='p-4 sm:p-8 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] shadow-xs'>
 										<label
 											htmlFor='photoInput'
-											className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1'>
-											Passport Size Photo <span className='text-red-600 font-bold'>*</span>
+											className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A] mb-1'>
+											Passport Size Photo <span className='text-[#F87171] font-bold'>*</span>
 										</label>
-										<p className='text-xs text-slate-500 mb-4'>
-											Upload a clear passport size photograph (PNG, JPEG or JPG).
+										<p className='text-xs sm:text-sm text-[#475569] mb-4 font-medium'>
+											Upload a clear passport size photograph.
 										</p>
 
-										<div className='flex items-center gap-4 flex-wrap sm:flex-nowrap'>
+										<div className='flex items-center gap-4 sm:gap-5 flex-wrap sm:flex-nowrap'>
 											{formData.photoDataUrl ? (
 												// eslint-disable-next-line @next/next/no-img-element
 												<img
 													src={formData.photoDataUrl}
 													alt='Cadet Preview'
-													className='w-20 h-20 sm:w-22 sm:h-22 rounded-2xl object-cover border-2 border-sky-600 shadow-sm flex-shrink-0'
+													className='w-20 h-20 sm:w-28 sm:h-28 rounded-2xl object-cover border-2 border-[#3B82F6] ring-4 ring-white shadow-md flex-shrink-0'
 												/>
 											) : (
-												<div className='w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-white border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 text-[10px] font-bold flex-shrink-0 shadow-2xs'>
-													<User className='w-7 h-7 mb-0.5 text-slate-400' />
+												<div className='w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-white border-2 border-dashed border-[#94A3B8] flex flex-col items-center justify-center text-[#94A3B8] text-xs font-bold flex-shrink-0 shadow-xs'>
+													<User className='w-6 h-6 sm:w-8 sm:h-8 mb-1 text-[#94A3B8]' />
 													PHOTO
 												</div>
 											)}
-											<div className='flex-1 min-w-[200px]'>
-												<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all hover:border-slate-400'>
-													<Upload className='w-4 h-4 text-sky-700' />
+											<div className='flex-1 min-w-[180px]'>
+												<label className='btn-secondary inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all'>
+													<Upload className='w-4 h-4 text-[#3B82F6]' />
 													<span>{formData.photoName ? 'Change Photo' : 'Select Photo'}</span>
 													<input
 														type='file'
@@ -1572,19 +1758,19 @@ export default function Home() {
 														className='sr-only'
 													/>
 												</label>
-												<p className='text-xs text-slate-600 font-medium truncate mt-2'>
+												<p className='text-xs sm:text-sm text-[#475569] font-medium truncate mt-2'>
 													{formData.photoName ? (
-														<span className='font-bold text-emerald-700 flex items-center gap-1.5'>
-															<Check className='w-4 h-4 text-emerald-600' /> {formData.photoName}
+														<span className='font-bold text-[#166534] flex items-center gap-1.5'>
+															<Check className='w-4 h-4 text-[#16A34A]' /> {formData.photoName}
 														</span>
 													) : (
-														'Accepts JPG, JPEG, PNG, up to 5MB'
+														'Accepts JPG, JPEG, PNG. (Max 5MB)'
 													)}
 												</p>
 											</div>
 										</div>
 										{errors.photo && touched.photo && (
-											<p className='text-xs font-semibold text-red-600 mt-2.5 flex items-center gap-1.5 animate-fadeIn'>
+											<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-2.5 flex items-center gap-1.5 animate-fadeIn'>
 												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.photo}
 											</p>
 										)}
@@ -1592,48 +1778,54 @@ export default function Home() {
 								</section>
 
 								{/* ======================================================== */}
-								{/* SECTION 2: ACADEMIC & RESEARCH PROFILE (Q8 - Q12) */}
+								{/* SECTION 2: ACADEMICS PROFILE (Q8 - Q12) */}
 								{/* ======================================================== */}
 								<section
 									id='section-2'
-									className={`space-y-7 ${currentStep === 2 ? 'block animate-fadeIn' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
-										<div className='flex items-center gap-3'>
-											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												<GraduationCap className='w-5 h-5 text-sky-300' />
+									className={`space-y-8 sm:space-y-10 ${currentStep === 2 ? 'block animate-fadeIn' : 'hidden'}`}>
+									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
+										<div className='flex items-start sm:items-center justify-between gap-4'>
+											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
+												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<GraduationCap className='w-6 h-6 text-white flex-shrink-0' />
+												</div>
+												<div className='min-w-0 flex-1'>
+													<div className='sm:hidden mb-1.5'>
+														<span className='section-badge text-xs py-1 px-3'>Section 2 of 5</span>
+													</div>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+														Academics Profile
+													</h2>
+													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
+														Questions 8 to 11 • Cadets should only upload the first page of their
+														work in PDF format
+													</p>
+												</div>
 											</div>
-											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
-													Academic & Research Profile
-												</h2>
-												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 8 to 11 • Cadets should only upload the first page of their work
-													in PDF format
-												</p>
-											</div>
+											<span className='section-badge hidden sm:inline-flex flex-shrink-0'>
+												Section 2 of 5
+											</span>
 										</div>
-										<span className='section-badge'>Section 2 of 5</span>
 									</div>
 
-									{/* Section 2 Guideline Notice */}
-
 									{/* Question 8: Current CGPA */}
-									<div id='cgpa' className='section-container space-y-3'>
-										<div className='flex items-center justify-between mb-1 flex-wrap gap-2'>
+									<div id='cgpa' className='section-container space-y-5'>
+										<div className='flex items-center justify-between mb-1 flex-wrap gap-3'>
 											<div>
 												<label
 													htmlFor='cgpaInput'
-													className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+													className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A] block'>
 													8. Current CGPA{' '}
-													{!isFirstYear && <span className='text-red-600 font-bold'>*</span>}
+													{!isFirstYear && <span className='text-[#F87171] font-bold'>*</span>}
 												</label>
 											</div>
-											<span className='text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200'>
+											<span
+												className={`text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full border ${isFirstYear ? ' bg-[#F1F5F9] text-[#94A3B8] border-[#E2E8F0]' : 'text-[#166534] bg-[#DCFCE7] border border-[#BBF7D0]'}`}>
 												{isFirstYear ? 'Exempted for first semester cadets' : 'Mention your CGPA'}
 											</span>
 										</div>
 
-										<div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 items-start'>
+										<div className='grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 items-start'>
 											<div>
 												<input
 													type='text'
@@ -1650,36 +1842,138 @@ export default function Home() {
 													}
 													className={`form-input ${
 														isFirstYear
-															? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none border-slate-200 font-bold'
+															? 'bg-[#F1F5F9] text-[#94A3B8] cursor-not-allowed select-none border-[#E2E8F0] font-bold'
 															: errors.cgpa && touched.cgpa
 																? 'input-error'
 																: ''
 													}`}
 												/>
 												{errors.cgpa && touched.cgpa && !isFirstYear && (
-													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5 animate-fadeIn'>
+													<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-2 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.cgpa}
 													</p>
 												)}
 											</div>
 										</div>
+
+										{/* Marksheet Proof Document (PDF) Upload */}
+										<div className='pt-4 space-y-3 border-t border-[#E2E8F0]'>
+											<div className='flex items-center justify-between flex-wrap gap-2'>
+												<div>
+													<label
+														htmlFor={isFirstYear ? undefined : 'marksheetInput'}
+														className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A] block'>
+														Semester Marksheet Proof
+													</label>
+													<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
+														Upload your latest semester marksheet or consolidated grade card in PDF
+														format
+													</span>
+												</div>
+											</div>
+
+											{isFirstYear ? (
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#F8FAFC] border-dashed border-[#E2E8F0] opacity-80 cursor-not-allowed select-none'>
+													<button
+														type='button'
+														disabled
+														className='inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl text-sm font-bold text-[#94A3B8] bg-[#F1F5F9] border border-[#E2E8F0] cursor-not-allowed select-none shadow-none flex-shrink-0'>
+														<Upload className='w-4 h-4 text-[#94A3B8]' />
+														<span>Upload Marksheet PDF</span>
+													</button>
+													<div className='flex-1 min-w-0'>
+														<span className='text-xs sm:text-sm text-[#64748B] font-medium flex items-center gap-2'>
+															<Info className='w-4 h-4 text-[#0284c7] flex-shrink-0' />
+															Upload your Semester Marksheet after the first semester exams are
+															completed. (Max. 15MB)
+														</span>
+													</div>
+												</div>
+											) : (
+												<div>
+													<div
+														className={`upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl ${
+															formData.marksheetName ? 'has-file' : ''
+														}`}>
+														<label className='btn-secondary inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+															<Upload className='w-4 h-4 text-[#3B82F6]' />
+															<span>
+																{formData.marksheetName
+																	? 'Change Marksheet PDF'
+																	: 'Upload Marksheet PDF'}
+															</span>
+															<input
+																type='file'
+																id='marksheetInput'
+																name='marksheet'
+																accept='.pdf,application/pdf'
+																onChange={(e) =>
+																	handlePdfChange(
+																		e,
+																		'marksheetName',
+																		'marksheetDataUrl',
+																		'marksheetFile',
+																	)
+																}
+																className='sr-only'
+															/>
+														</label>
+
+														<div className='flex-1 min-w-0'>
+															{formData.marksheetName ? (
+																<div className='flex items-center justify-between gap-3 bg-[#DCFCE7] px-4 py-3 rounded-2xl border border-[#86EFAC]'>
+																	<span className='text-sm font-bold text-[#166534] truncate flex items-center gap-2'>
+																		<FileCheck className='w-4 h-4 text-[#16A34A] flex-shrink-0' />
+																		{formData.marksheetName}
+																	</span>
+																	<button
+																		type='button'
+																		onClick={() =>
+																			setFormData((prev) => ({
+																				...prev,
+																				marksheetName: '',
+																				marksheetDataUrl: '',
+																			}))
+																		}
+																		className='text-xs sm:text-sm font-bold text-[#F87171] hover:text-red-700 px-3 py-1.5 rounded-xl bg-white border border-[#FCA5A5] flex-shrink-0 hover:bg-[#FEE2E2] transition-colors'
+																		title='Remove Marksheet PDF'>
+																		Remove
+																	</button>
+																</div>
+															) : (
+																<span className='text-sm text-[#475569] font-medium'>
+																	Upload latest semester grade card / marksheet (.pdf up to 15MB)
+																</span>
+															)}
+														</div>
+													</div>
+
+													{errors.marksheetFile && (
+														<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
+															{errors.marksheetFile}
+														</p>
+													)}
+												</div>
+											)}
+										</div>
 									</div>
 
 									{/* Question 9: Journal / Book Chapter Publications */}
-									<div className='section-container space-y-4'>
+									<div className='section-container space-y-5'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
 														9. Journal / Book Chapter Publications, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 font-medium block mt-1'>
+												<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
 													Mention Journal / Book chapter details & upload publication proof PDF
 												</span>
 											</div>
 											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+											<div className='flex items-center gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0] min-h-[48px]'>
 												<button
 													type='button'
 													onClick={() => {
@@ -1694,8 +1988,8 @@ export default function Home() {
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasJournalPub
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#0F172A] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													NIL
 												</button>
@@ -1704,8 +1998,8 @@ export default function Home() {
 													onClick={() => setFormData((prev) => ({ ...prev, hasJournalPub: true }))}
 													className={`na-toggle-btn ${
 														formData.hasJournalPub
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#22C55E] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													+ I Have Publications
 												</button>
@@ -1713,11 +2007,11 @@ export default function Home() {
 										</div>
 
 										{formData.hasJournalPub && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-4 space-y-4 border-t border-[#E2E8F0] animate-fadeIn'>
 												<div>
-													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+													<label className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A] mb-2'>
 														Journal / Book Chapter Publication Details{' '}
-														<span className='text-red-600 font-bold'>*</span>
+														<span className='text-[#F87171] font-bold'>*</span>
 													</label>
 													<textarea
 														name='journalDetails'
@@ -1728,16 +2022,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.journalDetails && touched.journalDetails ? 'input-error' : ''}`}
 													/>
 													{errors.journalDetails && touched.journalDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.journalDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
-														<Upload className='w-4 h-4 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>{formData.journalFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -1753,16 +2047,16 @@ export default function Home() {
 															className='sr-only'
 														/>
 													</label>
-													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
+													<span className='text-sm text-[#0F172A] font-medium truncate flex-1'>
 														{formData.journalFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
-																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+															<span className='text-[#166534] font-bold flex items-center gap-2'>
+																<FileCheck className='w-4 h-4 text-[#16A34A] flex-shrink-0' />{' '}
 																{formData.journalFileName}
 															</span>
 														) : (
-															<span className='text-slate-500 font-medium'>
+															<span className='text-[#475569] font-medium'>
 																Upload publication / chapter proof PDF (First page only){' '}
-																<span className='text-red-600 font-bold'>*</span>
+																<span className='text-[#F87171] font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -1776,13 +2070,13 @@ export default function Home() {
 																	journalFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
+															className='text-sm font-bold text-[#F87171] hover:text-red-700 p-2 rounded-xl hover:bg-[#FEE2E2] transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.journalFile && touched.journalFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
+													<p className='text-xs sm:text-sm font-semibold text-[#F87171] flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.journalFile}
 													</p>
 												)}
@@ -1791,20 +2085,20 @@ export default function Home() {
 									</div>
 
 									{/* Question 10: Patents / Design Registrations / Copyrights */}
-									<div className='section-container space-y-4'>
+									<div className='section-container space-y-5'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
 														10. Patents / Design Registrations / Copyrights, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 font-medium block mt-1'>
+												<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
 													Mention IPR details & upload certificate / filing document in PDF
 												</span>
 											</div>
 											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+											<div className='flex items-center gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0] min-h-[48px]'>
 												<button
 													type='button'
 													onClick={() => {
@@ -1819,8 +2113,8 @@ export default function Home() {
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasPatents
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#0F172A] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													NIL
 												</button>
@@ -1829,8 +2123,8 @@ export default function Home() {
 													onClick={() => setFormData((prev) => ({ ...prev, hasPatents: true }))}
 													className={`na-toggle-btn ${
 														formData.hasPatents
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#22C55E] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													+ I Have Patents/IPR
 												</button>
@@ -1838,10 +2132,10 @@ export default function Home() {
 										</div>
 
 										{formData.hasPatents && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-4 space-y-4 border-t border-[#E2E8F0] animate-fadeIn'>
 												<div>
-													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
-														Patent / IPR Details <span className='text-red-600 font-bold'>*</span>
+													<label className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A] mb-2'>
+														Patent / IPR Details <span className='text-[#F87171] font-bold'>*</span>
 													</label>
 													<textarea
 														name='patentDetails'
@@ -1852,16 +2146,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.patentDetails && touched.patentDetails ? 'input-error' : ''}`}
 													/>
 													{errors.patentDetails && touched.patentDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.patentDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
-														<Upload className='w-4 h-4 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>{formData.patentFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -1877,16 +2171,16 @@ export default function Home() {
 															className='sr-only'
 														/>
 													</label>
-													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
+													<span className='text-sm text-[#0F172A] font-medium truncate flex-1'>
 														{formData.patentFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
-																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+															<span className='text-[#166534] font-bold flex items-center gap-2'>
+																<FileCheck className='w-4 h-4 text-[#16A34A] flex-shrink-0' />{' '}
 																{formData.patentFileName}
 															</span>
 														) : (
-															<span className='text-slate-500 font-medium'>
+															<span className='text-[#475569] font-medium'>
 																Upload patent / filing PDF (First page only){' '}
-																<span className='text-red-600 font-bold'>*</span>
+																<span className='text-[#F87171] font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -1900,13 +2194,13 @@ export default function Home() {
 																	patentFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
+															className='text-sm font-bold text-[#F87171] hover:text-red-700 p-2 rounded-xl hover:bg-[#FEE2E2] transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.patentFile && touched.patentFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
+													<p className='text-xs sm:text-sm font-semibold text-[#F87171] flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.patentFile}
 													</p>
 												)}
@@ -1915,20 +2209,20 @@ export default function Home() {
 									</div>
 
 									{/* Question 11: Participation in Competitions / Hackathons */}
-									<div className='section-container space-y-4'>
+									<div className='section-container space-y-5'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
 														11. Competitions / Hackathons / Technothons, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 font-medium block mt-1'>
+												<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
 													Mention competitions and upload certificate in PDF.
 												</span>
 											</div>
 											{/* N/A Toggle */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+											<div className='flex items-center gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0] min-h-[48px]'>
 												<button
 													type='button'
 													onClick={() => {
@@ -1947,8 +2241,8 @@ export default function Home() {
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasCompetitions
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#0F172A] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													NIL
 												</button>
@@ -1959,8 +2253,8 @@ export default function Home() {
 													}
 													className={`na-toggle-btn ${
 														formData.hasCompetitions
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#22C55E] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													+ I Have Participated
 												</button>
@@ -1968,11 +2262,11 @@ export default function Home() {
 										</div>
 
 										{formData.hasCompetitions && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-4 space-y-4 border-t border-[#E2E8F0] animate-fadeIn'>
 												<div>
-													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+													<label className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A] mb-2'>
 														Competition & Achievement Details{' '}
-														<span className='text-red-600 font-bold'>*</span>
+														<span className='text-[#F87171] font-bold'>*</span>
 													</label>
 													<textarea
 														name='competitionDetails'
@@ -1983,16 +2277,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.competitionDetails && touched.competitionDetails ? 'input-error' : ''}`}
 													/>
 													{errors.competitionDetails && touched.competitionDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.competitionDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
-														<Upload className='w-4 h-4 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>
 															{formData.competitionFileName ? 'Change PDF' : 'Upload PDF'}
 														</span>
@@ -2010,16 +2304,16 @@ export default function Home() {
 															className='sr-only'
 														/>
 													</label>
-													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
+													<span className='text-sm text-[#0F172A] font-medium truncate flex-1'>
 														{formData.competitionFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
-																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+															<span className='text-[#166534] font-bold flex items-center gap-2'>
+																<FileCheck className='w-4 h-4 text-[#16A34A] flex-shrink-0' />{' '}
 																{formData.competitionFileName}
 															</span>
 														) : (
-															<span className='text-slate-500 font-medium'>
+															<span className='text-[#475569] font-medium'>
 																Upload certificate PDF{' '}
-																<span className='text-red-600 font-bold'>*</span>
+																<span className='text-[#F87171] font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -2033,13 +2327,13 @@ export default function Home() {
 																	competitionFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
+															className='text-sm font-bold text-[#F87171] hover:text-red-700 p-2 rounded-xl hover:bg-[#FEE2E2] transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.competitionFile && touched.competitionFile && (
-													<p className='text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-fadeIn'>
+													<p className='text-xs sm:text-sm font-semibold text-[#F87171] flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 														{errors.competitionFile}
 													</p>
@@ -2054,39 +2348,45 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-3'
-									className={`space-y-6 sm:space-y-7 ${currentStep === 3 ? 'block animate-fadeIn' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
-										<div className='flex items-center gap-3'>
-											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												<Award className='w-5 h-5 text-sky-300' />
+									className={`space-y-8 sm:space-y-10 ${currentStep === 3 ? 'block animate-fadeIn' : 'hidden'}`}>
+									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
+										<div className='flex items-start sm:items-center justify-between gap-4'>
+											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
+												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<Award className='w-6 h-6 text-white flex-shrink-0' />
+												</div>
+												<div className='min-w-0 flex-1'>
+													<div className='sm:hidden mb-1.5'>
+														<span className='section-badge text-xs py-1 px-3'>Section 3 of 5</span>
+													</div>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+														Co-Curricular & Leadership Profile
+													</h2>
+													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
+														Questions 12 to 14 • Activities, Awards & Leadership Positions
+													</p>
+												</div>
 											</div>
-											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
-													Co-Curricular & Leadership Profile
-												</h2>
-												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 12 to 14 • Activities, Awards & Leadership Positions
-												</p>
-											</div>
+											<span className='section-badge hidden sm:inline-flex flex-shrink-0'>
+												Section 3 of 5
+											</span>
 										</div>
-										<span className='section-badge'>Section 3 of 5</span>
 									</div>
 
 									{/* Question 12: Technical / Co-Curricular Activities */}
-									<div className='section-container space-y-4'>
+									<div className='section-container space-y-5'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
 														12. Activities / Events if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 font-medium block mt-1'>
-													Mention the activity, event, and your role, and upload certificate in PDF
-													.
+												<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
+													Mention the activity, event, and your role, and upload certificate in PDF.
 												</span>
 											</div>
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+											<div className='flex items-center gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0] min-h-[48px]'>
 												<button
 													type='button'
 													onClick={() => {
@@ -2105,8 +2405,8 @@ export default function Home() {
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasActivities
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#0F172A] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													NIL
 												</button>
@@ -2115,8 +2415,8 @@ export default function Home() {
 													onClick={() => setFormData((prev) => ({ ...prev, hasActivities: true }))}
 													className={`na-toggle-btn ${
 														formData.hasActivities
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#22C55E] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													+ I Have Activities / Events
 												</button>
@@ -2124,11 +2424,11 @@ export default function Home() {
 										</div>
 
 										{formData.hasActivities && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-4 space-y-4 border-t border-[#E2E8F0] animate-fadeIn'>
 												<div>
-													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+													<label className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A] mb-2'>
 														Activity & Contribution Details{' '}
-														<span className='text-red-600 font-bold'>*</span>
+														<span className='text-[#F87171] font-bold'>*</span>
 													</label>
 													<textarea
 														name='activityDetails'
@@ -2139,16 +2439,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.activityDetails && touched.activityDetails ? 'input-error' : ''}`}
 													/>
 													{errors.activityDetails && touched.activityDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.activityDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
-														<Upload className='w-4 h-4 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>{formData.activityFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
 															type='file'
@@ -2164,16 +2464,16 @@ export default function Home() {
 															className='sr-only'
 														/>
 													</label>
-													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
+													<span className='text-sm text-[#0F172A] font-medium truncate flex-1'>
 														{formData.activityFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
-																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+															<span className='text-[#166534] font-bold flex items-center gap-2'>
+																<FileCheck className='w-4 h-4 text-[#16A34A] flex-shrink-0' />{' '}
 																{formData.activityFileName}
 															</span>
 														) : (
-															<span className='text-slate-500 font-medium'>
+															<span className='text-[#475569] font-medium'>
 																Upload certificate PDF{' '}
-																<span className='text-red-600 font-bold'>*</span>
+																<span className='text-[#F87171] font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -2187,13 +2487,13 @@ export default function Home() {
 																	activityFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
+															className='text-sm font-bold text-[#F87171] hover:text-red-700 p-2 rounded-xl hover:bg-[#FEE2E2] transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.activityFile && touched.activityFile && (
-													<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+													<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.activityFile}
 													</p>
 												)}
@@ -2202,19 +2502,19 @@ export default function Home() {
 									</div>
 
 									{/* Question 13: Major Achievements / Awards */}
-									<div className='section-container space-y-4'>
+									<div className='section-container space-y-5'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
 														13. Participation in Conference / Awards, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 font-medium block mt-1'>
+												<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
 													Mention the conference / award & upload certificate / proof in PDF.
 												</span>
 											</div>
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+											<div className='flex items-center gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0] min-h-[48px]'>
 												<button
 													type='button'
 													onClick={() => {
@@ -2233,8 +2533,8 @@ export default function Home() {
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasAchievements
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#0F172A] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													NIL
 												</button>
@@ -2245,8 +2545,8 @@ export default function Home() {
 													}
 													className={`na-toggle-btn ${
 														formData.hasAchievements
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#22C55E] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													+ I Have Participated / Won Awards
 												</button>
@@ -2254,11 +2554,11 @@ export default function Home() {
 										</div>
 
 										{formData.hasAchievements && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-4 space-y-4 border-t border-[#E2E8F0] animate-fadeIn'>
 												<div>
-													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+													<label className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A] mb-2'>
 														Participation & Award Details{' '}
-														<span className='text-red-600 font-bold'>*</span>
+														<span className='text-[#F87171] font-bold'>*</span>
 													</label>
 													<textarea
 														name='achievementDetails'
@@ -2269,16 +2569,16 @@ export default function Home() {
 														className={`form-input resize-none ${errors.achievementDetails && touched.achievementDetails ? 'input-error' : ''}`}
 													/>
 													{errors.achievementDetails && touched.achievementDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.achievementDetails}
 														</p>
 													)}
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl'>
-													<label className='inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
-														<Upload className='w-4 h-4 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>
 															{formData.achievementFileName ? 'Change PDF' : 'Upload PDF'}
 														</span>
@@ -2296,16 +2596,16 @@ export default function Home() {
 															className='sr-only'
 														/>
 													</label>
-													<span className='text-xs text-slate-700 font-medium truncate flex-1'>
+													<span className='text-sm text-[#0F172A] font-medium truncate flex-1'>
 														{formData.achievementFileName ? (
-															<span className='text-emerald-700 font-bold flex items-center gap-1.5'>
-																<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />{' '}
+															<span className='text-[#166534] font-bold flex items-center gap-2'>
+																<FileCheck className='w-4 h-4 text-[#16A34A] flex-shrink-0' />{' '}
 																{formData.achievementFileName}
 															</span>
 														) : (
-															<span className='text-slate-500 font-medium'>
+															<span className='text-[#475569] font-medium'>
 																Upload award proof PDF{' '}
-																<span className='text-red-600 font-bold'>*</span>
+																<span className='text-[#F87171] font-bold'>*</span>
 															</span>
 														)}
 													</span>
@@ -2319,13 +2619,13 @@ export default function Home() {
 																	achievementFileDataUrl: '',
 																}))
 															}
-															className='text-xs font-bold text-red-600 hover:text-red-800 p-1.5 rounded-lg hover:bg-red-50 transition-colors'>
+															className='text-sm font-bold text-[#F87171] hover:text-red-700 p-2 rounded-xl hover:bg-[#FEE2E2] transition-colors'>
 															<Trash2 className='w-4 h-4' />
 														</button>
 													)}
 												</div>
 												{errors.achievementFile && touched.achievementFile && (
-													<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+													<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 														{errors.achievementFile}
 													</p>
@@ -2335,20 +2635,20 @@ export default function Home() {
 									</div>
 
 									{/* Question 14: Leadership / Coordinator Positions Held */}
-									<div className='section-container space-y-4'>
+									<div className='section-container space-y-5'>
 										<div className='flex items-center justify-between flex-wrap gap-3'>
 											<div>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+													<label className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A]'>
 														14. Leadership / Coordinator Positions Held, if any
 													</label>
 												</div>
-												<span className='text-xs text-slate-500 font-medium block mt-1'>
+												<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
 													Mention position, organisation/club/event, duration, and responsibilities
 													held.
 												</span>
 											</div>
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+											<div className='flex items-center gap-2 bg-[#F8FAFC] p-1.5 rounded-2xl border border-[#E2E8F0] min-h-[48px]'>
 												<button
 													type='button'
 													onClick={() => {
@@ -2363,8 +2663,8 @@ export default function Home() {
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasLeadership
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#0F172A] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													NIL
 												</button>
@@ -2373,8 +2673,8 @@ export default function Home() {
 													onClick={() => setFormData((prev) => ({ ...prev, hasLeadership: true }))}
 													className={`na-toggle-btn ${
 														formData.hasLeadership
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#22C55E] text-white shadow-xs font-bold'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													+ I Held Positions
 												</button>
@@ -2382,11 +2682,11 @@ export default function Home() {
 										</div>
 
 										{formData.hasLeadership && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
+											<div className='pt-4 space-y-4 border-t border-[#E2E8F0] animate-fadeIn'>
 												<div>
-													<label className='block text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] mb-1.5'>
+													<label className='block text-sm sm:text-base font-bold tracking-tight text-[#0F172A] mb-2'>
 														Leadership Role Details{' '}
-														<span className='text-red-600 font-bold'>*</span>
+														<span className='text-[#F87171] font-bold'>*</span>
 													</label>
 													<textarea
 														name='leadershipDetails'
@@ -2397,7 +2697,7 @@ export default function Home() {
 														className={`form-input resize-none ${errors.leadershipDetails && touched.leadershipDetails ? 'input-error' : ''}`}
 													/>
 													{errors.leadershipDetails && touched.leadershipDetails && (
-														<p className='text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
+														<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 															<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 															{errors.leadershipDetails}
 														</p>
@@ -2413,34 +2713,41 @@ export default function Home() {
 								{/* ======================================================== */}
 								<section
 									id='section-4'
-									className={`space-y-6 sm:space-y-7 ${currentStep === 4 ? 'block animate-fadeIn' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
-										<div className='flex items-center gap-3'>
-											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												<Lightbulb className='w-5 h-5 text-sky-300' />
+									className={`space-y-8 sm:space-y-10 ${currentStep === 4 ? 'block animate-fadeIn' : 'hidden'}`}>
+									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
+										<div className='flex items-start sm:items-center justify-between gap-4'>
+											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
+												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<Lightbulb className='w-6 h-6 text-white flex-shrink-0' />
+												</div>
+												<div className='min-w-0 flex-1'>
+													<div className='sm:hidden mb-1.5'>
+														<span className='section-badge text-xs py-1 px-3'>Section 4 of 5</span>
+													</div>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+														Innovation & Problem-Solving
+													</h2>
+													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
+														Questions 15 to 17 • Vision, Ecosystem Challenges & Technology Interests
+													</p>
+												</div>
 											</div>
-											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
-													Innovation & Problem-Solving
-												</h2>
-												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 15 to 17 • Vision, Ecosystem Challenges & Technology Interests
-												</p>
-											</div>
+											<span className='section-badge hidden sm:inline-flex flex-shrink-0'>
+												Section 4 of 5
+											</span>
 										</div>
-										<span className='section-badge'>Section 4 of 5</span>
 									</div>
 
 									{/* Question 15: Maritime / University Ecosystem Problem */}
-									<div id='problemMaritime' className='section-container space-y-3'>
+									<div id='problemMaritime' className='section-container space-y-4'>
 										<div>
 											<label
 												htmlFor='problemMaritimeInput'
-												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+												className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A] block'>
 												15. What is one Problem in the Indian Maritime University Ecosystem you
-												would like to solve? <span className='text-red-600 font-bold'>*</span>
+												would like to solve? <span className='text-[#F87171] font-bold'>*</span>
 											</label>
-											<p className='text-xs text-slate-500 font-medium leading-relaxed block mt-1'>
+											<p className='text-sm text-[#475569] font-medium leading-relaxed block mt-1'>
 												Briefly describe the problem and why you think it needs to be addressed.
 											</p>
 										</div>
@@ -2455,25 +2762,25 @@ export default function Home() {
 											className={`form-input resize-y ${errors.problemMaritime && touched.problemMaritime ? 'input-error' : ''}`}
 										/>
 										{errors.problemMaritime && touched.problemMaritime && (
-											<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1.5 animate-fadeIn'>
+											<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.problemMaritime}
 											</p>
 										)}
-										<div className='flex justify-end text-xs text-slate-400 font-mono font-semibold'>
+										<div className='flex justify-end text-xs text-[#94A3B8] font-mono font-semibold'>
 											{formData.problemMaritime.length} characters
 										</div>
 									</div>
 
 									{/* Question 16: Problem in Society */}
-									<div id='problemSociety' className='section-container space-y-3'>
+									<div id='problemSociety' className='section-container space-y-4'>
 										<div>
 											<label
 												htmlFor='problemSocietyInput'
-												className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
-												16. What is one Problem in Society you would like to solve?
-												<span className='text-red-600 font-bold'>*</span>
+												className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A] block'>
+												16. What is one Problem in Society you would like to solve?{' '}
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
-											<p className='text-xs text-slate-500 font-medium leading-relaxed block mt-1'>
+											<p className='text-sm text-[#475569] font-medium leading-relaxed block mt-1'>
 												Briefly describe the problem and why you think it needs to be addressed.
 											</p>
 										</div>
@@ -2488,29 +2795,29 @@ export default function Home() {
 											className={`form-input resize-y ${errors.problemSociety && touched.problemSociety ? 'input-error' : ''}`}
 										/>
 										{errors.problemSociety && touched.problemSociety && (
-											<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1.5 animate-fadeIn'>
+											<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.problemSociety}
 											</p>
 										)}
-										<div className='flex justify-end text-xs text-slate-400 font-mono font-semibold'>
+										<div className='flex justify-end text-xs text-[#94A3B8] font-mono font-semibold'>
 											{formData.problemSociety.length} characters
 										</div>
 									</div>
 
 									{/* Question 17: Area(s) of Innovation / Technology Interest */}
-									<div id='areasOfInterest' className='section-container space-y-4'>
+									<div id='areasOfInterest' className='section-container space-y-5'>
 										<div>
-											<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+											<label className='text-sm sm:text-base font-bold tracking-tight text-[#0F172A] block'>
 												17. Which area(s) of innovation / technology interest you most?{' '}
-												<span className='text-red-600 font-bold'>*</span>
+												<span className='text-[#F87171] font-bold'>*</span>
 											</label>
-											<p className='text-xs text-slate-500 font-medium mt-1 block'>
+											<p className='text-sm text-[#475569] font-medium mt-1 block'>
 												Select at least 1 innovation domain from below or add custom areas.
 											</p>
 										</div>
 
 										{/* Interactive Tag Chips */}
-										<div className='flex flex-wrap gap-2.5 pt-1'>
+										<div className='flex flex-wrap gap-3 pt-1'>
 											{SUGGESTED_INTERESTS.map((tag) => {
 												const active = formData.areasOfInterest.includes(tag);
 												return (
@@ -2520,9 +2827,9 @@ export default function Home() {
 														onClick={() => toggleInterest(tag)}
 														className={`interest-tag-chip ${active ? 'active' : ''}`}>
 														{active ? (
-															<Check className='w-3.5 h-3.5 stroke-[2.5]' />
+															<Check className='w-4 h-4 stroke-[2.5]' />
 														) : (
-															<Plus className='w-3.5 h-3.5' />
+															<Plus className='w-4 h-4' />
 														)}
 														<span>{tag}</span>
 													</button>
@@ -2531,7 +2838,7 @@ export default function Home() {
 										</div>
 
 										{/* Add Custom Tag */}
-										<div className='flex gap-2.5 pt-2'>
+										<div className='flex flex-col sm:flex-row gap-3 pt-2'>
 											<input
 												type='text'
 												value={formData.customInterest}
@@ -2550,20 +2857,20 @@ export default function Home() {
 											<button
 												type='button'
 												onClick={handleAddCustomInterest}
-												className='btn-secondary whitespace-nowrap text-xs flex items-center gap-1.5'>
-												<Plus className='w-3.5 h-3.5 text-sky-700' /> Add Area
+												className='btn-secondary whitespace-nowrap text-sm font-bold flex items-center justify-center gap-2'>
+												<Plus className='w-4 h-4 text-[#3B82F6]' /> Add Area
 											</button>
 										</div>
 
 										{errors.areasOfInterest && (
-											<p className='text-xs font-semibold text-red-600 mt-1 flex items-center gap-1.5 animate-fadeIn'>
+											<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
 												<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.areasOfInterest}
 											</p>
 										)}
 
 										{formData.areasOfInterest.length > 0 && (
-											<p className='text-xs font-bold text-emerald-800 mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
-												<Sparkles className='w-3.5 h-3.5 text-amber-500' />
+											<p className='text-sm font-bold text-[#166534] mt-2 flex items-center gap-2 animate-fadeIn'>
+												<Sparkles className='w-4 h-4 text-[#FBBF24]' />
 												Selected ({formData.areasOfInterest.length}) domains
 											</p>
 										)}
@@ -2576,21 +2883,31 @@ export default function Home() {
 								<section
 									id='section-5'
 									className={`space-y-7 ${currentStep === 5 ? 'block animate-fadeIn' : 'hidden'}`}>
-									<div className='flex items-center justify-between border-b border-slate-200 pb-4'>
-										<div className='flex items-center gap-3'>
-											<div className='w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2544] to-[#163866] text-white flex items-center justify-center font-bold text-sm shadow-xs'>
-												<ShieldCheck className='w-5 h-5 text-sky-300' />
+									<div className='border-b border-[#E2E8F0] pb-3.5 sm:pb-4'>
+										<div className='flex items-start sm:items-center justify-between gap-3'>
+											<div className='flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1'>
+												<div className='w-11 sm:w-12 h-11 sm:h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-base shadow-sm flex-shrink-0 mt-0.5 sm:mt-0'>
+													<ShieldCheck className='w-6 h-6 text-white flex-shrink-0' />
+												</div>
+												<div className='min-w-0 flex-1'>
+													<div className='sm:hidden mb-1'>
+														<span className='section-badge text-[10px] py-0.5 px-2'>
+															Section 5 of 5
+														</span>
+													</div>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] tracking-tight leading-snug font-heading'>
+														Supporting Documents & Official Declaration
+													</h2>
+													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
+														Questions 18 & 19 • Resume / CV, Master PDF & Official Student
+														Declaration
+													</p>
+												</div>
 											</div>
-											<div>
-												<h2 className='text-lg sm:text-xl font-extrabold text-[#0e2544] uppercase tracking-wide leading-snug sm:leading-tight font-heading'>
-													Supporting Documents & Official Declaration
-												</h2>
-												<p className='text-xs sm:text-[13px] text-slate-500 font-medium'>
-													Questions 18 & 19 • Resume / CV, Master PDF & Official Student Declaration
-												</p>
-											</div>
+											<span className='section-badge hidden sm:inline-flex flex-shrink-0'>
+												Section 5 of 5
+											</span>
 										</div>
-										<span className='section-badge'>Section 5 of 5</span>
 									</div>
 
 									{/* Question 18: Upload Detailed Resume / CV (Optional / Recommended with 2 Tabs) */}
@@ -2600,21 +2917,21 @@ export default function Home() {
 												<div className='flex items-center gap-2 flex-wrap'>
 													<label
 														htmlFor='resumeInput'
-														className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544]'>
+														className='text-xs sm:text-sm font-extrabold text-[#0F172A] uppercase tracking-wider block font-heading'>
 														18. Upload Resume / CV (PDF)
 													</label>
-													<span className='text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded-full'>
+													<span className='text-[10px] sm:text-xs font-bold text-[#166534] bg-[#DCFCE7] border border-[#BBF7D0] px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full'>
 														Recommended
 													</span>
 												</div>
-												<span className='text-xs text-slate-500 font-medium block mt-1'>
+												<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
 													Upload your latest CV/resume in PDF format (strongly recommended for
 													council evaluation, or select NIL if not available).
 												</span>
 											</div>
 
 											{/* N/A / Upload Toggle Tabs */}
-											<div className='flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200'>
+											<div className='flex items-center gap-1.5 bg-[#F1F5F9] p-1.5 rounded-2xl border border-[#CBD5E1]'>
 												<button
 													type='button'
 													onClick={() => {
@@ -2628,8 +2945,8 @@ export default function Home() {
 													}}
 													className={`na-toggle-btn ${
 														!formData.hasResume
-															? 'bg-[#0e2544] text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#0F172A] text-white shadow-xs'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													NIL
 												</button>
@@ -2638,8 +2955,8 @@ export default function Home() {
 													onClick={() => setFormData((prev) => ({ ...prev, hasResume: true }))}
 													className={`na-toggle-btn ${
 														formData.hasResume
-															? 'bg-emerald-700 text-white shadow-xs'
-															: 'text-slate-600 hover:text-slate-900'
+															? 'bg-[#22C55E] text-white shadow-xs'
+															: 'text-[#475569] hover:text-[#0F172A]'
 													}`}>
 													+ Upload Resume (Recommended)
 												</button>
@@ -2647,23 +2964,22 @@ export default function Home() {
 										</div>
 
 										{formData.hasResume && (
-											<div className='pt-3.5 space-y-3.5 border-t border-slate-200 animate-fadeIn'>
-												<div className='p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-sky-50 to-slate-50 border border-sky-200 text-sky-950 text-xs sm:text-[13px] leading-relaxed space-y-1.5 shadow-2xs'>
-													<span className='font-bold text-sky-950 block'>
-														📌 Automatic Single Master PDF Storage:
+											<div className='pt-3.5 space-y-3.5 border-t border-[#E2E8F0] animate-fadeIn'>
+												<div className='p-3.5 sm:p-5 rounded-2xl bg-[#EFF6FF] border-2 border-[#BFDBFE] text-[#1E3A8A] text-xs sm:text-sm leading-relaxed space-y-1.5 shadow-xs'>
+													<span className='font-extrabold text-[#1E3A8A] block text-xs sm:text-base'>
+														📌 Upload a detailed Resume / CV:
 													</span>
-													<p className='text-sky-900 font-medium'>
-														• Includes: Latest Resume, Semester Marksheets, Certificate Proofs,
-														Awards & Positions.
+													<p className='text-[#1E40AF] font-medium'>
+														• Includes: Latest Resume, Certificate Proofs, Awards & Positions.
 													</p>
-													<p className='text-sky-900 font-medium'>
-														• Accepted Format: <strong>.pdf</strong> (Maximum size: 15MB).
+													<p className='text-[#1E40AF] font-medium'>
+														• Accepted Format: <strong>.pdf</strong> (Max. 15MB).
 													</p>
 												</div>
 
-												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
-													<label className='inline-flex items-center justify-center gap-2 px-5 py-3 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider text-[#0e2544] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs transition-all flex-shrink-0 hover:border-slate-400'>
-														<Upload className='w-4 h-4 text-sky-700' />
+												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl'>
+													<label className='inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3.5 border-2 border-[#CBD5E1] rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0 hover:border-[#3B82F6] min-h-[44px] sm:min-h-[50px]'>
+														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>
 															{formData.resumeName ? 'Change Resume PDF' : 'Upload Resume PDF'}
 														</span>
@@ -2681,9 +2997,9 @@ export default function Home() {
 
 													<div className='flex-1 min-w-0'>
 														{formData.resumeName ? (
-															<div className='flex items-center justify-between gap-2 bg-emerald-50 p-3 rounded-xl border border-emerald-200'>
-																<span className='text-xs sm:text-sm font-bold text-emerald-900 truncate flex items-center gap-1.5'>
-																	<FileCheck className='w-4 h-4 text-emerald-600 flex-shrink-0' />
+															<div className='flex items-center justify-between gap-2 bg-[#DCFCE7] p-2.5 sm:p-3 rounded-2xl border border-[#BBF7D0]'>
+																<span className='text-xs sm:text-sm font-bold text-[#166534] truncate flex items-center gap-1.5'>
+																	<FileCheck className='w-4 h-4 text-[#16A34A] flex-shrink-0' />
 																	{formData.resumeName}
 																</span>
 																<button
@@ -2695,12 +3011,12 @@ export default function Home() {
 																			resumeDataUrl: '',
 																		}))
 																	}
-																	className='text-xs font-bold text-red-600 hover:text-red-800 px-2.5 py-1 rounded-lg bg-white border border-red-200 flex-shrink-0 hover:bg-red-50 transition-colors'>
+																	className='text-xs font-bold text-[#DC2626] hover:text-[#991B1B] px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-white border border-[#FECACA] flex-shrink-0 hover:bg-[#FEE2E2] transition-colors min-h-[32px] sm:min-h-[36px]'>
 																	Remove
 																</button>
 															</div>
 														) : (
-															<span className='text-xs sm:text-sm text-slate-500 font-medium'>
+															<span className='text-xs sm:text-sm text-[#475569] font-medium'>
 																No file chosen yet (.pdf up to 15MB)
 															</span>
 														)}
@@ -2708,7 +3024,7 @@ export default function Home() {
 												</div>
 
 												{errors.resume && (
-													<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5 animate-fadeIn'>
+													<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-2 flex items-center gap-1.5 animate-fadeIn'>
 														<AlertCircle className='w-4 h-4 flex-shrink-0' /> {errors.resume}
 													</p>
 												)}
@@ -2717,18 +3033,20 @@ export default function Home() {
 									</div>
 
 									{/* Question 19: Student Declaration */}
-									<div id='declarationAccepted' className='section-container space-y-5'>
-										<label className='text-xs sm:text-[13px] font-bold uppercase tracking-wider text-[#0e2544] block'>
+									<div
+										id='declarationAccepted'
+										className='section-container space-y-4 sm:space-y-5'>
+										<label className='text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#0F172A] block font-heading'>
 											19. Student Declaration / Consent for Participation in IIC Activities{' '}
-											<span className='text-red-600 font-bold'>*</span>
+											<span className='text-[#F87171] font-bold'>*</span>
 										</label>
 
 										{/* Declaration Statement Box */}
-										<div className='declaration-certificate-box p-5 sm:p-6 text-slate-800 text-xs sm:text-sm leading-relaxed'>
-											<strong className='text-[#0e2544] font-bold block mb-2 uppercase tracking-wide text-xs sm:text-sm font-heading'>
+										<div className='declaration-certificate-box p-4 sm:p-6 text-[#1E293B] text-xs sm:text-sm leading-relaxed rounded-2xl'>
+											<strong className='text-[#0F172A] font-extrabold block mb-1.5 sm:mb-2 uppercase tracking-wide text-xs sm:text-sm font-heading'>
 												Declaration Statement:
 											</strong>
-											<p className='italic text-slate-700 leading-relaxed font-medium'>
+											<p className='italic text-[#334155] leading-relaxed font-medium text-xs sm:text-sm'>
 												“I hereby declare that the information provided by me is true and correct to
 												the best of my knowledge. I understand that submission of this form does not
 												guarantee selection to the IIC Student Council. If selected, I agree to
@@ -2739,7 +3057,7 @@ export default function Home() {
 										</div>
 
 										{/* Declaration Consent Checkbox */}
-										<label className='flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl border-2 border-slate-200 bg-white hover:border-[#0e2544]/60 cursor-pointer transition-all shadow-2xs'>
+										<label className='flex items-start gap-3 p-3.5 sm:p-5 rounded-2xl border-2 border-[#CBD5E1] bg-white hover:border-[#3B82F6] cursor-pointer transition-all shadow-xs min-h-[48px] sm:min-h-[56px]'>
 											<input
 												type='checkbox'
 												name='declarationAccepted'
@@ -2753,15 +3071,15 @@ export default function Home() {
 														setErrors((prev) => ({ ...prev, declarationAccepted: '' }));
 													}
 												}}
-												className='mt-1 w-4 h-4 text-[#0e2544] rounded border-slate-300 focus:ring-[#0e2544] cursor-pointer'
+												className='mt-1 w-4 h-4 sm:w-5 sm:h-5 text-[#3B82F6] rounded-lg border-[#CBD5E1] focus:ring-[#3B82F6] cursor-pointer accent-[#3B82F6]'
 											/>
-											<div className='text-xs sm:text-sm text-slate-800 font-semibold leading-relaxed select-none'>
+											<div className='text-xs sm:text-sm text-[#0F172A] font-bold leading-relaxed select-none'>
 												I have read, understood, and solemnly accept the Declaration above.
 											</div>
 										</label>
 
 										{errors.declarationAccepted && touched.declarationAccepted && (
-											<p className='text-xs font-semibold text-red-600 mt-2 flex items-center gap-1.5 animate-fadeIn'>
+											<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-2 flex items-center gap-1.5 animate-fadeIn'>
 												<AlertCircle className='w-4 h-4 flex-shrink-0' />{' '}
 												{errors.declarationAccepted}
 											</p>
@@ -2769,15 +3087,15 @@ export default function Home() {
 
 										{/* Digital Signature Confirmation Preview */}
 										{formData.cadetName && (
-											<div className='pt-3 flex items-center justify-between text-xs text-slate-500 border-t border-slate-200 flex-wrap gap-2'>
+											<div className='pt-3 flex items-center justify-between text-xs sm:text-sm text-[#475569] border-t border-[#CBD5E1] flex-wrap gap-2'>
 												<span>
-													<strong className='text-slate-700'>Digital Signature:</strong>{' '}
-													<span className='font-mono font-bold text-[#0e2544] uppercase bg-slate-100 px-2 py-0.5 rounded border border-slate-200'>
+													<strong className='text-[#0F172A]'>Digital Signature:</strong>{' '}
+													<span className='font-mono font-bold text-[#1D4ED8] uppercase bg-[#DBEAFE] px-2.5 py-1 rounded-xl border border-[#BFDBFE]'>
 														{formData.cadetName}
 													</span>
 												</span>
 												<span>
-													<strong className='text-slate-700'>Timestamp:</strong>{' '}
+													<strong className='text-[#0F172A]'>Timestamp:</strong>{' '}
 													{new Date().toLocaleDateString('en-GB')}
 												</span>
 											</div>
@@ -2787,12 +3105,12 @@ export default function Home() {
 
 								{/* Submission Error Banner */}
 								{submissionError && (
-									<div className='p-4 sm:p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950 text-xs sm:text-sm space-y-1.5 animate-fadeIn'>
-										<div className='flex items-center gap-2 font-bold text-rose-800'>
-											<AlertCircle className='w-4 h-4 text-rose-600 flex-shrink-0' />
+									<div className='p-4 sm:p-5 rounded-2xl bg-[#FEE2E2] border-2 border-[#FCA5A5] text-[#7F1D1D] text-xs sm:text-sm space-y-1.5 animate-fadeIn'>
+										<div className='flex items-center gap-2 font-bold text-[#991B1B] text-sm sm:text-base'>
+											<AlertCircle className='w-5 h-5 text-[#DC2626] flex-shrink-0' />
 											<span>Submission Could Not Be Completed</span>
 										</div>
-										<p className='text-rose-900 leading-relaxed font-medium pl-6'>
+										<p className='text-[#991B1B] leading-relaxed font-medium pl-7'>
 											{submissionError}
 										</p>
 									</div>
@@ -2801,7 +3119,7 @@ export default function Home() {
 								{/* ======================================================== */}
 								{/* STEP NAVIGATION & SUBMIT CONTROLS */}
 								{/* ======================================================== */}
-								<div className='pt-7 border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between gap-3.5'>
+								<div className='pt-7 border-t border-[#E2E8F0] flex flex-col sm:flex-row items-center justify-between gap-3.5'>
 									<div className='flex items-center gap-2.5 w-full sm:w-auto'>
 										<button
 											type='button'
@@ -2820,22 +3138,25 @@ export default function Home() {
 									</div>
 
 									<div className='flex items-center gap-3 w-full sm:w-auto'>
-										{/* On Steps 1 to 4: Only show "Next" Button */}
+										{/* On Steps 1 to 4: Only show "Next" Button with dedicated key */}
 										{currentStep < 5 ? (
 											<button
+												key={`next-btn-step-${currentStep}`}
 												type='button'
-												onClick={nextStep}
+												onClick={(e) => nextStep(e)}
 												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2'>
 												<span>Next: {SECTIONS[currentStep]?.title}</span>
 												<ChevronRight className='w-4 h-4' />
 											</button>
 										) : (
-											/* On Step 5: Show "Submit Enrollment Form" Button */
+											/* On Step 5: Show "Submit Enrollment Form" Button with dedicated key and type='button' */
 											<button
-												type='submit'
+												key='submit-final-enrollment-btn'
+												type='button'
+												onClick={(e) => handleSubmit(e)}
 												disabled={submitting}
-												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-800 to-teal-800 hover:from-emerald-900 hover:to-teal-900 border-emerald-900 shadow-md'>
-												<ShieldCheck className='w-4 h-4' />
+												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 bg-[#22C55E] hover:bg-[#16A34A] border-b-4 border-[#15803D] active:border-b-0 shadow-md'>
+												<ShieldCheck className='w-5 h-5' />
 												<span>
 													{submitting ? 'Submitting Application...' : 'Submit Enrollment Form'}
 												</span>
@@ -2849,7 +3170,7 @@ export default function Home() {
 				</div>
 
 				{/* Footer note */}
-				<p className='text-center text-xs sm:text-sm text-slate-500 font-bold uppercase tracking-wider mt-6 select-none'>
+				<p className='text-center text-xs sm:text-sm text-[#475569] font-bold uppercase tracking-wider mt-6 select-none'>
 					Indian Maritime University • Kolkata Campus • IIC 2026–27
 				</p>
 				<p aria-hidden='true' className='text-center opacity-0'>
