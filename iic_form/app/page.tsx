@@ -30,7 +30,6 @@ import {
 	Compass,
 	Calendar,
 } from 'lucide-react';
-import { generateMasterCombinedPdf } from './lib/generateMasterPdf';
 
 export interface FormData {
 	// Section 1: Basic Cadet Profile (Q1 - Q7 + Photo)
@@ -1003,19 +1002,6 @@ export default function Home() {
 				});
 			}
 
-			// Generate the Complete Unified Master PDF (Form + Proofs) using pdf-lib
-			let compiledMasterPdfDataUrl = '';
-			try {
-				const masterPdfResult = await generateMasterCombinedPdf(
-					formData,
-					generatedRefId,
-					attachedProofs,
-				);
-				compiledMasterPdfDataUrl = masterPdfResult.mergedDataUrl;
-			} catch (pdfErr) {
-				console.warn('Could not compile local master PDF:', pdfErr);
-			}
-
 			// Faculty forwarding email list
 			const rawFacultyEmails =
 				process.env.NEXT_PUBLIC_FACULTY_EMAILS ||
@@ -1026,7 +1012,6 @@ export default function Home() {
 				.map((e) => e.trim())
 				.filter((e) => e.includes('@'));
 
-			// Streamlined payload: send masterPdfDataUrl without duplicating raw proof arrays
 			const payload = {
 				...formData,
 				referenceId: generatedRefId,
@@ -1055,14 +1040,14 @@ export default function Home() {
 				declaration: declarationFormatted,
 				date: displayDate,
 
-				// Unified pre-merged single Master PDF
-				masterPdfDataUrl: compiledMasterPdfDataUrl,
+				// Attached individual document proofs
+				attachedProofs,
 				attachedProofsCount: attachedProofs.length,
 			};
 
 			const rawDirectUrl =
 				process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL ||
-				'https://script.google.com/macros/s/AKfycbzVklG1gmnnhi1wq6HVMTNr_1XcMADOURNKSJOHFTSDmZzUCPkSQzFWIHslsOIRU3M6/exec';
+				'https://script.google.com/macros/s/AKfycbz7fhNq7uINoqJUu9VCia_D29DHLR7c1JTAHHNHW6LpTows7CQv5E2vlhazsnI37fdX/exec';
 			const directGoogleUrl = rawDirectUrl
 				.trim()
 				.replace(/^['"]|['"]$/g, '')

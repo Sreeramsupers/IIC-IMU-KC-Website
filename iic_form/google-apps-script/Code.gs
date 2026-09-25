@@ -9,8 +9,7 @@
  *   ROOT: "2026-27"
  *     └── [Year of Cadet] (e.g. "1st Year", "2nd Year", "3rd Year", "4th Year")
  *           └── [Cadet Name] (e.g. "JOHN DOE - REG12345")
- *                 ├── Application_Form_JOHN_DOE_IIC-2627-XXXX.pdf
- *                 ├── Master_Consolidated_JOHN_DOE_IIC-2627-XXXX.pdf (if proofs exist)
+ *                 ├── Application_Form_JOHN_DOE_IIC-2627-XXXX.pdf (Generated from Google Docs)
  *                 ├── Passport_Photo_JOHN_DOE.jpg
  *                 ├── Marksheet_JOHN_DOE.pdf
  *                 ├── Journal_Pub_JOHN_DOE.pdf
@@ -21,10 +20,13 @@
  *                 ├── Leadership_Proof_JOHN_DOE.pdf
  *                 └── Resume_JOHN_DOE.pdf
  * 
- * Mailing Policy:
+ * Mailing & Attachment Policy:
  *   1. Cadets: No emails sent to cadets (Disabled as per policy).
- *   2. Faculty / Evaluation Panel: Submissions and attachments are sent ONLY to configured
- *      faculty email addresses (via FORWARD_EMAILS in Code.gs or process.env.FORWARD_EMAILS).
+ *   2. Faculty / Evaluation Panel: Submissions forwarded to configured faculty emails.
+ *   3. Email Attachments:
+ *        - Primary Attachment: Official Application Form PDF (Exported directly from Google Docs template).
+ *        - Accompanying Attachments: All individual cadet uploaded PDFs (Marksheet, Certificates, Resume).
+ *        - Notice: Consolidated PDF generation has been completely removed.
  */
 
 // =========================================================================================
@@ -57,8 +59,8 @@ const FORWARD_EMAILS = [
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({
     status: 'online',
-    version: '2026-v2-FACULTY-ONLY',
-    message: 'IIC IMU Kolkata Enrollment Web Service is active. Faculty-only forwarding enabled.',
+    version: '2026-v3-GOOGLE-DOCS-DIRECT-ATTACHMENTS',
+    message: 'IIC IMU Kolkata Enrollment Web Service is active. Google Docs PDF and direct document attachments enabled.',
     templateId: TEMPLATE_DOC_ID,
     facultyRecipients: FORWARD_EMAILS,
     timestamp: new Date().toISOString()
@@ -129,12 +131,11 @@ function doPost(e) {
       ? data.areasOfInterest.join(', ')
       : 'NIL');
 
-    // Find first valid accessible Google Doc template (new template first, fallback to old if not accessible)
+    // Find first valid accessible Google Doc template (new template first, fallback to configured/old)
     const candidateTemplateIds = [
       data.templateDocId,
       TEMPLATE_DOC_ID,
-      '1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw',
-      '1x69S7y0X7UJYR7x2ZEKCoQzPFCb-2nHctp6XNQG3E7I'
+      '1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw'
     ].filter(id => id && typeof id === 'string' && id.trim().length > 10);
 
     let templateFile = null;
@@ -156,7 +157,7 @@ function doPost(e) {
         const copyDoc = DocumentApp.openById(copyFile.getId());
         const body = copyDoc.getBody();
 
-        // Replace Placeholders in Google Doc
+        // Replace Placeholders in Google Doc with cadet form data
         body.replaceText('{{name}}', cadetName);
         body.replaceText('{{regd_no}}', data.regNumber || '');
         body.replaceText('{{email}}', data.email || '');
@@ -199,7 +200,7 @@ function doPost(e) {
         body.replaceText('{{society_problem}}', data.problemSociety ? data.problemSociety : 'NIL');
         body.replaceText('{{interests}}', interestsStr);
 
-        // Fallbacks for literal text
+        // Fallbacks for literal template text if present
         body.replaceText('Journal / Book Chapter Publication PDF: attached / NIL', 'Journal / Book Chapter Publication PDF: ' + journalPdfStatus);
         body.replaceText('Marksheet PDF: attached / NIL', 'Marksheet PDF: ' + marksheetStatus);
         body.replaceText('Patent / IPR PDF: attached / NIL', 'Patent / IPR PDF: ' + patentPdfStatus);
@@ -215,7 +216,7 @@ function doPost(e) {
             const photoBlob = dataUrlToBlob(data.photoDataUrl, 'passport_photo_' + refId + '.jpg');
             replacePlaceholderWithImage(body, '{{photo}}', photoBlob, 110, 130);
           } catch (photoErr) {
-            console.warn('Error inserting photo:', photoErr);
+            console.warn('Error inserting photo into doc:', photoErr);
             body.replaceText('{{photo}}', '[Photo Uploaded Online]');
           }
         } else {
@@ -224,7 +225,7 @@ function doPost(e) {
 
         copyDoc.saveAndClose();
 
-        // Export Application Form as PDF
+        // Export Official Application Form as PDF directly from Google Docs
         appPdfBlob = copyFile.getAs('application/pdf');
         const appPdfName = `Application_Form_${cleanCadetName}_${refId}.pdf`;
         appPdfBlob.setName(appPdfName);
@@ -247,120 +248,130 @@ function doPost(e) {
       }
     }
 
-    // Fallback if template PDF generation was skipped or errored
+    // Fallback if template PDF generation was not accessible
     if (!savedAppPdf) {
-      if (data.masterPdfDataUrl) {
-        try {
-          appPdfBlob = dataUrlToBlob(data.masterPdfDataUrl, `Application_Form_${cleanCadetName}_${refId}.pdf`);
-          savedAppPdf = cadetFolder.createFile(appPdfBlob);
-          try {
-            savedAppPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          } catch (_) {}
-        } catch (_) {}
-      }
-      if (!savedAppPdf) {
-        appPdfBlob = Utilities.newBlob(`IIC Enrollment Application - ${cadetName} (${refId})\nReg No: ${data.regNumber || 'N/A'}\nDept: ${data.department || 'N/A'}`, 'text/plain', `Application_Form_${cleanCadetName}_${refId}.txt`);
-        savedAppPdf = cadetFolder.createFile(appPdfBlob);
-        try {
-          savedAppPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        } catch (_) {}
-      }
+      console.warn('[Doc Warning] Google Doc template was not accessible. Generating text fallback.');
+      appPdfBlob = Utilities.newBlob(
+        `INDIAN MARITIME UNIVERSITY - KOLKATA CAMPUS\n` +
+        `INSTITUTION'S INNOVATION COUNCIL (IIC 2026-27)\n` +
+        `OFFICIAL ENROLLMENT APPLICATION\n\n` +
+        `Cadet Name: ${cadetName}\n` +
+        `Reference ID: ${refId}\n` +
+        `Registration No: ${data.regNumber || 'N/A'}\n` +
+        `Department: ${data.department || 'N/A'}\n` +
+        `Year of Study: ${data.yearOfStudy || 'N/A'}\n` +
+        `Semester: ${data.semester || 'N/A'}\n` +
+        `CGPA: ${data.cgpa || 'N/A'}\n` +
+        `Email: ${data.email || 'N/A'}\n` +
+        `Phone: ${data.phone || 'N/A'}\n` +
+        `Submitted At: ${formattedDate} (IST)\n\n` +
+        `Maritime Problem: ${data.problemMaritime || 'N/A'}\n` +
+        `Society Problem: ${data.problemSociety || 'N/A'}\n` +
+        `Interests: ${interestsStr}\n\n` +
+        `Declaration: ${declarationText}\n`,
+        'text/plain',
+        `Application_Form_${cleanCadetName}_${refId}.txt`
+      );
+      savedAppPdf = cadetFolder.createFile(appPdfBlob);
+      try {
+        savedAppPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (_) {}
     }
 
     // =====================================================================================
-    // 3. UPLOAD ALL CADET'S INDIVIDUAL DOCUMENTS TO THEIR DRIVE FOLDER
+    // 3. UPLOAD ALL CADET'S INDIVIDUAL DOCUMENTS TO THEIR DRIVE FOLDER & GATHER FOR EMAIL
     // =====================================================================================
     const savedCadetFiles = [];
+    const uploadedDocumentBlobs = [];
 
-    // 1. Passport Photo
+    function saveAndCollectCadetFile(folder, dataUrl, filename, label, isDocumentProof) {
+      if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.includes(',')) {
+        return null;
+      }
+      try {
+        const blob = dataUrlToBlob(dataUrl, filename);
+        const file = folder.createFile(blob);
+        try {
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch (_) {}
+        savedCadetFiles.push({ label: label, file: file, name: filename });
+        if (isDocumentProof) {
+          uploadedDocumentBlobs.push(blob);
+        }
+        return file;
+      } catch (e) {
+        console.warn(`[File Upload Error] Failed to save ${filename}:`, e);
+        return null;
+      }
+    }
+
+    // 1. Passport Photo (Saved to Drive, not attached to email as photo is in the doc)
     if (data.photoDataUrl) {
-      const f = saveBase64File(cadetFolder, data.photoDataUrl, `Passport_Photo_${cleanCadetName}.jpg`);
-      if (f) savedCadetFiles.push({ label: 'Passport Photo', file: f });
+      saveAndCollectCadetFile(cadetFolder, data.photoDataUrl, `Passport_Photo_${cleanCadetName}.jpg`, 'Passport Photo', false);
     }
 
-    // 2. Marksheet
+    // 2. Semester Marksheet (PDF)
     if (data.marksheetDataUrl) {
-      const fileName = `Marksheet_${cleanCadetName}_${sanitizeFileName(data.marksheetName || 'Marksheet.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.marksheetDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Semester Marksheet', file: f });
+      const fileName = `Marksheet_${cleanCadetName}_${sanitizeFileName(data.marksheetName || 'Semester_Marksheet.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.marksheetDataUrl, fileName, 'Semester Marksheet', true);
     }
 
-    // 3. Journal Publication Proof
+    // 3. Journal Publication Proof (PDF)
     if (data.journalFileDataUrl) {
-      const fileName = `Journal_Pub_${cleanCadetName}_${sanitizeFileName(data.journalFileName || 'Journal.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.journalFileDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Journal Publication Proof', file: f });
+      const fileName = `Journal_Pub_${cleanCadetName}_${sanitizeFileName(data.journalFileName || 'Journal_Publication.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.journalFileDataUrl, fileName, 'Journal Publication Proof', true);
     }
 
-    // 4. Patent / IPR Proof
+    // 4. Patent / IPR Proof (PDF)
     if (data.patentFileDataUrl) {
-      const fileName = `Patent_Doc_${cleanCadetName}_${sanitizeFileName(data.patentFileName || 'Patent.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.patentFileDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Patent / IPR Document', file: f });
+      const fileName = `Patent_Doc_${cleanCadetName}_${sanitizeFileName(data.patentFileName || 'Patent_IPR_Document.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.patentFileDataUrl, fileName, 'Patent / IPR Document', true);
     }
 
-    // 5. Competition / Hackathon Certificate
+    // 5. Competition / Hackathon Certificate (PDF)
     if (data.competitionFileDataUrl) {
-      const fileName = `Competition_Cert_${cleanCadetName}_${sanitizeFileName(data.competitionFileName || 'Competition.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.competitionFileDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Competition Certificate', file: f });
+      const fileName = `Competition_Cert_${cleanCadetName}_${sanitizeFileName(data.competitionFileName || 'Competition_Certificate.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.competitionFileDataUrl, fileName, 'Competition Certificate', true);
     }
 
-    // 6. Technical Activity Certificate
+    // 6. Technical Activity Certificate (PDF)
     if (data.activityFileDataUrl) {
-      const fileName = `Activity_Cert_${cleanCadetName}_${sanitizeFileName(data.activityFileName || 'Activity.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.activityFileDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Activity Certificate', file: f });
+      const fileName = `Activity_Cert_${cleanCadetName}_${sanitizeFileName(data.activityFileName || 'Activity_Certificate.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.activityFileDataUrl, fileName, 'Activity Certificate', true);
     }
 
-    // 7. Achievement / Award Proof
+    // 7. Achievement / Award Proof (PDF)
     if (data.achievementFileDataUrl) {
-      const fileName = `Achievement_Cert_${cleanCadetName}_${sanitizeFileName(data.achievementFileName || 'Achievement.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.achievementFileDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Achievement Proof', file: f });
+      const fileName = `Achievement_Cert_${cleanCadetName}_${sanitizeFileName(data.achievementFileName || 'Achievement_Certificate.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.achievementFileDataUrl, fileName, 'Achievement Proof', true);
     }
 
-    // 8. Leadership Proof
+    // 8. Leadership Proof (PDF)
     if (data.leadershipFileDataUrl) {
-      const fileName = `Leadership_Proof_${cleanCadetName}_${sanitizeFileName(data.leadershipFileName || 'Leadership.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.leadershipFileDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Leadership Proof', file: f });
+      const fileName = `Leadership_Proof_${cleanCadetName}_${sanitizeFileName(data.leadershipFileName || 'Leadership_Proof.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.leadershipFileDataUrl, fileName, 'Leadership Proof', true);
     }
 
-    // 9. Resume / CV
+    // 9. Resume / CV (PDF)
     if (data.resumeDataUrl) {
-      const fileName = `Resume_${cleanCadetName}_${sanitizeFileName(data.resumeName || 'Resume.pdf')}`;
-      const f = saveBase64File(cadetFolder, data.resumeDataUrl, fileName);
-      if (f) savedCadetFiles.push({ label: 'Resume / CV', file: f });
+      const fileName = `Resume_${cleanCadetName}_${sanitizeFileName(data.resumeName || 'Cadet_Resume.pdf')}`;
+      saveAndCollectCadetFile(cadetFolder, data.resumeDataUrl, fileName, 'Resume / CV', true);
     }
 
-    // 10. Any additional attached proofs from attachedProofs array
+    // 10. Additional attached proofs from attachedProofs array (if any)
     if (Array.isArray(data.attachedProofs)) {
       data.attachedProofs.forEach((item, idx) => {
-        if (item.dataUrl) {
-          const fileName = `Attached_Proof_${idx + 1}_${cleanCadetName}_${sanitizeFileName(item.name || 'Proof.pdf')}`;
-          const f = saveBase64File(cadetFolder, item.dataUrl, fileName);
-          if (f) savedCadetFiles.push({ label: item.name || `Proof ${idx + 1}`, file: f });
+        if (item && item.dataUrl) {
+          const rawName = item.name || `Proof_${idx + 1}.pdf`;
+          const sName = sanitizeFileName(rawName);
+          // Avoid duplicate saving if already saved via individual fields above
+          const alreadySaved = savedCadetFiles.some(f => f.name && f.name.includes(sName));
+          if (!alreadySaved) {
+            const fileName = `Attached_Proof_${idx + 1}_${cleanCadetName}_${sName}`;
+            saveAndCollectCadetFile(cadetFolder, item.dataUrl, fileName, item.name || `Proof ${idx + 1}`, true);
+          }
         }
       });
-    }
-
-    // 11. Save Master Consolidated PDF (if generated by frontend)
-    let masterPdfFile = null;
-    let masterPdfBlob = null;
-    if (data.masterPdfDataUrl) {
-      try {
-        const masterFileName = `Master_Consolidated_${cleanCadetName}_${refId}.pdf`;
-        masterPdfBlob = dataUrlToBlob(data.masterPdfDataUrl, masterFileName);
-        masterPdfFile = cadetFolder.createFile(masterPdfBlob);
-        masterPdfFile.setDescription(`Consolidated Application Form and Proofs for ${cadetName} (${refId})`);
-        try {
-          masterPdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        } catch (_) {}
-        console.log(`[Master PDF Saved] ${masterFileName} saved to cadet folder.`);
-      } catch (masterErr) {
-        console.warn('Could not save masterPdfDataUrl:', masterErr);
-      }
     }
 
     console.log(`[Drive Archival Complete] Saved ${savedCadetFiles.length} uploaded document(s) in: ${ROOT_FOLDER_NAME} > ${yearFolderName} > ${cadetFolderName}`);
@@ -384,7 +395,6 @@ function doPost(e) {
           phone: data.phone || '',
           cgpa: isFirstYear ? 'Exempted for 1st Year' : (data.cgpa ? String(data.cgpa) : 'Not Applicable'),
           appPdfUrl: savedAppPdf ? savedAppPdf.getUrl() : '',
-          masterPdfUrl: masterPdfFile ? masterPdfFile.getUrl() : (savedAppPdf ? savedAppPdf.getUrl() : ''),
           driveFolderUrl: cadetFolder ? cadetFolder.getUrl() : '',
           journal: data.hasJournalPub ? (data.journalDetails ? data.journalDetails : 'Yes (Attached)') : 'NIL',
           book: data.hasBookChapter ? (data.bookChapterDetails ? data.bookChapterDetails : 'Yes (Attached)') : 'NIL',
@@ -455,21 +465,38 @@ function doPost(e) {
 
     let forwardEmailSent = false;
     let forwardEmailError = null;
+    const forwardAttachments = [];
+
+    // ===================================================================================
+    // ATTACHMENTS FORWARDED TO FACULTY:
+    // 1. Official Application Form PDF (Exported directly from Google Docs template)
+    if (savedAppPdf) {
+      try {
+        const appBlob = savedAppPdf.getBlob().setName(`Application_Form_${cleanCadetName}_${refId}.pdf`);
+        forwardAttachments.push(appBlob);
+      } catch (blobErr) {
+        if (appPdfBlob) forwardAttachments.push(appPdfBlob);
+      }
+    } else if (appPdfBlob) {
+      forwardAttachments.push(appPdfBlob);
+    }
+    // 2. All individual cadet uploaded PDFs (Marksheet, Certificates, Resume)
+    if (uploadedDocumentBlobs && uploadedDocumentBlobs.length > 0) {
+      uploadedDocumentBlobs.forEach(blob => {
+        forwardAttachments.push(blob);
+      });
+    }
 
     if (recipientList.length > 0) {
       try {
         console.log(`[Forwarding] Preparing email with attachments to ${recipientList.length} recipient(s): ${recipientList.join(', ')}`);
 
-        // ONLY ATTACH ONE SINGLE CONSOLIDATED PDF ATTACHMENT
-        // (Contains the Official Application Form followed by all uploaded certificates & proofs merged together)
-        const singleConsolidatedPdf = masterPdfBlob ? masterPdfBlob.copyBlob() : appPdfBlob.copyBlob();
-        singleConsolidatedPdf.setName(`IIC_Application_Consolidated_${cleanCadetName}_${refId}.pdf`);
-        const forwardAttachments = [singleConsolidatedPdf];
-
         const reviewerSubject = `[IIC 2026–27 Submission] ${cadetName} (${data.yearOfStudy || 'Year N/A'}) - Ref: ${refId}`;
         const driveFolderUrl = cadetFolder.getUrl();
         const appPdfUrl = savedAppPdf.getUrl();
 
+        // Plaintext summary for reviewer email
+        const attachmentsSummaryList = forwardAttachments.map(att => `  - ${att.getName()}`).join('\n');
         const reviewerPlainText = `IIC IMU Kolkata - New Cadet Application Received\n\n` +
           `Cadet Details:\n` +
           `- Name: ${cadetName}\n` +
@@ -485,9 +512,15 @@ function doPost(e) {
           `Google Drive Location:\n` +
           `${ROOT_FOLDER_NAME} > ${yearFolderName} > ${cadetFolderName}\n` +
           `Direct Folder Link: ${driveFolderUrl}\n\n` +
-          `Attached to this email:\n` +
-          `- 1 Single Consolidated PDF Document (Official Application Form + All Uploaded Proofs Merged)\n\n` +
+          `Attached to this email (${forwardAttachments.length} document(s)):\n` +
+          `${attachmentsSummaryList}\n\n` +
           `Institution's Innovation Council (IIC) • IMU Kolkata Campus`;
+
+        // HTML summary for reviewer email
+        const attachmentHtmlItems = forwardAttachments.map((att, idx) => {
+          const isMainForm = idx === 0;
+          return `<li style="margin-bottom: 4px;"><strong>${att.getName()}</strong> ${isMainForm ? '<span style="color:#0284c7;font-size:12px;">(Official Application Form from Google Docs)</span>' : ''}</li>`;
+        }).join('');
 
         const reviewerHtml = `
           <div style="font-family: Arial, Helvetica, sans-serif; max-width: 650px; margin: 0 auto; color: #1e293b; line-height: 1.6; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; background: #ffffff;">
@@ -543,13 +576,23 @@ function doPost(e) {
                 </a>
               </div>
 
+              <!-- ATTACHED DOCUMENTS LISTING -->
+              <div style="background: #f0fdf4; border: 1.5px solid #22c55e; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                <p style="margin: 0 0 8px; font-size: 13.5px; color: #15803d; font-weight: bold;">
+                  📎 Documents Attached to this Email (${forwardAttachments.length} file${forwardAttachments.length === 1 ? '' : 's'}):
+                </p>
+                <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #166534;">
+                  ${attachmentHtmlItems}
+                </ul>
+              </div>
+
               <!-- QUALIFICATIONS & RESEARCH SUMMARY -->
               <h4 style="margin: 16px 0 8px; color: #0e2544; font-size: 14px; text-transform: uppercase;">Profile Highlights & Uploads</h4>
               <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; border: 1px solid #e2e8f0; margin-bottom: 18px;">
                 <tr style="background: #f1f5f9; border-bottom: 1px solid #cbd5e1;">
                   <th style="padding: 6px 10px; text-align: left;">Category</th>
                   <th style="padding: 6px 10px; text-align: left;">Details</th>
-                  <th style="padding: 6px 10px; text-align: center;">Proof PDF</th>
+                  <th style="padding: 6px 10px; text-align: center;">Status</th>
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
                   <td style="padding: 6px 10px; font-weight: bold;">Semester Marksheet</td>
@@ -603,10 +646,6 @@ function doPost(e) {
                 <p style="margin: 0 0 4px; font-size: 12.5px; font-weight: bold; color: #0284c7;">Problem in Society Cadet Wants to Solve:</p>
                 <p style="margin: 0; font-size: 13px; color: #334155;">${data.problemSociety || 'None specified'}</p>
               </div>
-
-              <div style="background: #eff6ff; border: 1.5px solid #3b82f6; border-radius: 8px; padding: 14px; font-size: 13px; color: #1e40af; text-align: center;">
-                📎 <strong>1 Consolidated Master PDF Document</strong> is attached to this email (combining the cadet's official enrollment form and all uploaded marksheet/certificate/resume proofs in sequence).
-              </div>
             </div>
           </div>
         `;
@@ -623,7 +662,7 @@ function doPost(e) {
             attachments: forwardAttachments
           });
           forwardEmailSent = true;
-          console.log(`[Forwarding Success (MailApp)] Emailed attachments to: ${recipientString}`);
+          console.log(`[Forwarding Success (MailApp)] Emailed ${forwardAttachments.length} attachment(s) to: ${recipientString}`);
         } catch (fMailErr) {
           console.warn(`[MailApp Warning] ${fMailErr.toString()}, falling back to GmailApp...`);
           try {
@@ -633,15 +672,15 @@ function doPost(e) {
               attachments: forwardAttachments
             });
             forwardEmailSent = true;
-            console.log(`[Forwarding Success (GmailApp)] Emailed attachments to: ${recipientString}`);
+            console.log(`[Forwarding Success (GmailApp)] Emailed ${forwardAttachments.length} attachment(s) to: ${recipientString}`);
           } catch (gmailErr) {
-            console.warn(`[Attachment Warning] Both MailApp and GmailApp failed with attachments: ${gmailErr.toString()}. Retrying without attachment...`);
+            console.warn(`[Attachment Warning] Email attachment size limit exceeded: ${gmailErr.toString()}. Retrying without attachment...`);
             try {
               MailApp.sendEmail({
                 to: recipientString,
                 subject: reviewerSubject + ' [Files in Drive]',
                 body: reviewerPlainText + `\n\nNotice: Direct email attachment limit reached. Please view/download all files via Google Drive:\n${driveFolderUrl}`,
-                htmlBody: reviewerHtml + `<div style="margin-top:16px;padding:12px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:8px;font-size:13px;text-align:center;"><strong>Notice:</strong> Document attachment size exceeded email limits. All files (Application Form, Marksheets, Certificates) are stored in Google Drive. Click the button above to view.</div>`,
+                htmlBody: reviewerHtml + `<div style="margin-top:16px;padding:12px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:8px;font-size:13px;text-align:center;"><strong>Notice:</strong> Document attachment size exceeded email limits. All files (Google Docs Application Form, Marksheets, Certificates, Resume) are safely stored in Google Drive. Click the button above to view.</div>`,
                 name: 'IIC IMU Kolkata Portal'
               });
               forwardEmailSent = true;
@@ -665,7 +704,7 @@ function doPost(e) {
     // =====================================================================================
     return ContentService.createTextOutput(JSON.stringify({
       status: 'success',
-      version: '2026-v2-FACULTY-ONLY',
+      version: '2026-v3-GOOGLE-DOCS-DIRECT-ATTACHMENTS',
       referenceId: refId,
       drivePath: `${ROOT_FOLDER_NAME} > ${yearFolderName} > ${cadetFolderName}`,
       driveFolderUrl: cadetFolder.getUrl(),
@@ -675,7 +714,8 @@ function doPost(e) {
       forwardEmailSent: forwardEmailSent,
       forwardEmailError: forwardEmailError,
       forwardRecipientsCount: recipientList.length,
-      filesUploadedCount: savedCadetFiles.length + 1
+      filesUploadedCount: savedCadetFiles.length + 1,
+      attachmentsSentCount: forwardAttachments ? forwardAttachments.length : 0
     })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (fatalErr) {
@@ -750,28 +790,7 @@ function getOrCreateSubFolder(parentFolder, childFolderName) {
 }
 
 /**
- * Saves a base64 dataUrl directly as a file inside a specific Google Drive folder
- * and ensures it is viewable with link
- */
-function saveBase64File(folder, dataUrl, filename) {
-  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.includes(',')) {
-    return null;
-  }
-  try {
-    const blob = dataUrlToBlob(dataUrl, filename);
-    const file = folder.createFile(blob);
-    try {
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    } catch (_) {}
-    return file;
-  } catch (e) {
-    console.warn(`[File Upload Error] Failed to save ${filename}:`, e);
-    return null;
-  }
-}
-
-/**
- * Sanitizes a filename for Google Drive storage
+ * Sanitizes a filename for Google Drive storage and email attachments
  */
 function sanitizeFileName(raw) {
   if (!raw) return 'document.pdf';
@@ -845,7 +864,6 @@ const STANDARD_HEADERS = [
   'Phone Number',
   'CGPA',
   'Application Form PDF',
-  'Consolidated Proofs PDF',
   'Google Drive Cadet Folder',
   'Journal Publications',
   'Book Chapters',
@@ -929,7 +947,6 @@ function appendCadetRowToSheet(sheet, record) {
     phone: record.phone ? "'" + record.phone.toString().trim() : '',
     cgpa: record.cgpa || '',
     appPdf: record.appPdfUrl || '',
-    proofPdf: record.masterPdfUrl || record.appPdfUrl || '',
     driveFolder: record.driveFolderUrl || '',
     journal: record.journal || 'NIL',
     book: record.book || 'NIL',
@@ -994,7 +1011,8 @@ function appendCadetRowToSheet(sheet, record) {
       rowValues.push(map.appPdf);
       matchedCount++;
     } else if (h.includes('master') || h.includes('consolidated') || h.includes('proof') || (h.includes('doc') && h.includes('pdf'))) {
-      rowValues.push(map.proofPdf);
+      // Map any old consolidated proof column to drive folder URL
+      rowValues.push(map.driveFolder || map.appPdf);
       matchedCount++;
     } else if (h.includes('drive') || h.includes('folder')) {
       rowValues.push(map.driveFolder);
@@ -1052,7 +1070,6 @@ function appendCadetRowToSheet(sheet, record) {
       map.phone,
       map.cgpa,
       map.appPdf,
-      map.proofPdf,
       map.driveFolder,
       map.journal,
       map.book,
@@ -1099,25 +1116,13 @@ function testDriveHierarchyAndMailing() {
   // Test Template Doc Access
   try {
     const newDoc = DriveApp.getFileById('1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw');
-    console.log('New Template Doc Connected: ' + newDoc.getName() + ' (' + newDoc.getId() + ')');
+    console.log('Template Doc Connected: ' + newDoc.getName() + ' (' + newDoc.getId() + ')');
   } catch (err) {
-    console.warn('NOTICE: New Template Doc (1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw) is not yet accessible to this Google account: ' + err.toString() + '. Please open that Google Doc and set Share > Anyone with link > Editor/Viewer.');
+    console.warn('NOTICE: Template Doc (1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw) is not accessible to this Google account: ' + err.toString() + '. Please open that Google Doc and set Share > Anyone with link > Viewer/Editor.');
   }
 
-  // Test email dispatch to configured faculty email(s)
-  const targetEmail = (FORWARD_EMAILS && FORWARD_EMAILS.length > 0) ? FORWARD_EMAILS.join(',') : Session.getActiveUser().getEmail();
-  if (targetEmail) {
-    console.log('Attempting test email dispatch to: ' + targetEmail);
-    MailApp.sendEmail({
-      to: targetEmail,
-      subject: '[Verification Test] IIC IMU Kolkata Faculty Mailer',
-      body: 'Congratulations! Faculty email notifications are configured and working properly from Google Apps Script.\n\nRemaining Daily Quota: ' + MailApp.getRemainingDailyQuota(),
-      name: 'IIC IMU Kolkata Portal'
-    });
-    console.log('Test email successfully dispatched to ' + targetEmail);
-  }
-
-  console.log('Drive hierarchy, sheet connection & mailing test completed successfully!');
+  // Test email dispatch disabled to prevent unwanted test emails
+  console.log('Drive hierarchy & sheet connection test completed successfully! (Email sending disabled in test function)');
 }
 
 /**
