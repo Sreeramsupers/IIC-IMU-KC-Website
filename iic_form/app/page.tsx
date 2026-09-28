@@ -1749,7 +1749,7 @@ export default function Home() {
 															<Check className='w-4 h-4 text-[#16A34A]' /> {formData.photoName}
 														</span>
 													) : (
-														'Accepts JPG, JPEG, PNG. (Max 5MB)'
+														'Accepts JPG, JPEG, PNG. (Max. 5MB)'
 													)}
 												</p>
 											</div>
@@ -1851,8 +1851,7 @@ export default function Home() {
 														Semester Marksheet Proof
 													</label>
 													<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
-														Upload your latest semester marksheet or consolidated grade card in PDF
-														format
+														Combine and upload all semester's marksheet in a single PDF file
 													</span>
 												</div>
 											</div>
@@ -1869,8 +1868,7 @@ export default function Home() {
 													<div className='flex-1 min-w-0'>
 														<span className='text-xs sm:text-sm text-[#64748B] font-medium flex items-center gap-2'>
 															<Info className='w-4 h-4 text-[#0284c7] flex-shrink-0' />
-															Upload your Semester Marksheet after the first semester exams are
-															completed. (Max. 15MB)
+															File Format: PDF (Max. 15MB)
 														</span>
 													</div>
 												</div>
@@ -1927,7 +1925,7 @@ export default function Home() {
 																</div>
 															) : (
 																<span className='text-sm text-[#475569] font-medium'>
-																	Upload latest semester grade card / marksheet (.pdf up to 15MB)
+																	File Format: PDF (Max. 15MB)
 																</span>
 															)}
 														</div>
@@ -2950,18 +2948,6 @@ export default function Home() {
 
 										{formData.hasResume && (
 											<div className='pt-3.5 space-y-3.5 border-t border-[#E2E8F0] animate-fadeIn'>
-												<div className='p-3.5 sm:p-5 rounded-2xl bg-[#EFF6FF] border-2 border-[#BFDBFE] text-[#1E3A8A] text-xs sm:text-sm leading-relaxed space-y-1.5 shadow-xs'>
-													<span className='font-extrabold text-[#1E3A8A] block text-xs sm:text-base'>
-														📌 Upload a detailed Resume / CV:
-													</span>
-													<p className='text-[#1E40AF] font-medium'>
-														• Includes: Latest Resume, Certificate Proofs, Awards & Positions.
-													</p>
-													<p className='text-[#1E40AF] font-medium'>
-														• Accepted Format: <strong>.pdf</strong> (Max. 15MB).
-													</p>
-												</div>
-
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl'>
 													<label className='inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3.5 border-2 border-[#CBD5E1] rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0 hover:border-[#3B82F6] min-h-[44px] sm:min-h-[50px]'>
 														<Upload className='w-4 h-4 text-[#3B82F6]' />
@@ -3002,7 +2988,7 @@ export default function Home() {
 															</div>
 														) : (
 															<span className='text-xs sm:text-sm text-[#475569] font-medium'>
-																No file chosen yet (.pdf up to 15MB)
+																No file chosen yet. File Format: PDF (Max. 5MB)
 															</span>
 														)}
 													</div>
