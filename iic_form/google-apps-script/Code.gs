@@ -21,9 +21,10 @@
  *                 └── Resume_JOHN_DOE.pdf
  * 
  * Mailing & Attachment Policy:
- *   1. Cadets: No emails sent to cadets (Disabled as per policy).
- *   2. Faculty / Evaluation Panel: Submissions forwarded to configured faculty emails.
- *   3. Email Attachments:
+ *   1. Cadets / Students: No emails sent to cadets. Drive folders are NEVER shared with student emails.
+ *   2. Drive Files: All sharing scripts on Drive files have been removed; files remain private.
+ *   3. Faculty / Evaluation Panel: Submissions forwarded to configured faculty emails only.
+ *   4. Email Attachments:
  *        - Primary Attachment: Official Application Form PDF (Exported directly from Google Docs template).
  *        - Accompanying Attachments: All individual cadet uploaded PDFs (Marksheet, Certificates, Resume).
  *        - Notice: Consolidated PDF generation has been completely removed.
@@ -230,12 +231,9 @@ function doPost(e) {
         const appPdfName = `Application_Form_${cleanCadetName}_${refId}.pdf`;
         appPdfBlob.setName(appPdfName);
 
-        // Save official application form inside cadet's drive folder
+        // Save official application form inside cadet's drive folder (Drive file sharing script removed)
         savedAppPdf = cadetFolder.createFile(appPdfBlob);
         savedAppPdf.setDescription(`Official IIC Application Form for ${cadetName} (${refId})`);
-        try {
-          savedAppPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        } catch (_) {}
 
         // Clean up temporary Google Doc copy
         try {
@@ -273,9 +271,6 @@ function doPost(e) {
         `Application_Form_${cleanCadetName}_${refId}.txt`
       );
       savedAppPdf = cadetFolder.createFile(appPdfBlob);
-      try {
-        savedAppPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      } catch (_) {}
     }
 
     // =====================================================================================
@@ -290,10 +285,8 @@ function doPost(e) {
       }
       try {
         const blob = dataUrlToBlob(dataUrl, filename);
+        // Save file to drive folder without any public/link sharing script
         const file = folder.createFile(blob);
-        try {
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        } catch (_) {}
         savedCadetFiles.push({ label: label, file: file, name: filename });
         if (isDocumentProof) {
           uploadedDocumentBlobs.push(blob);
@@ -443,23 +436,25 @@ function doPost(e) {
       });
     }
 
-    // STRICT POLICY: Cadets must NEVER receive emails.
-    // Strip cadet's email from recipientList if present
+    // STRICT SECURITY & PRIVACY POLICY:
+    // 1. Cadets / students must NEVER receive emails.
+    // 2. The Drive folder and files are NEVER shared with the student email under any circumstances.
     const cadetEmailToExclude = (data.email || '').toLowerCase().trim();
     recipientList = recipientList.filter(em => {
       const clean = (em || '').toLowerCase().trim();
       return clean && clean !== cadetEmailToExclude;
     });
 
-    // Automatically share Root Folder and Cadet Folder with all faculty recipients as Editors
+    // Share Drive folders strictly with verified faculty recipients as Editors (NEVER the student email)
     recipientList.forEach(facEmail => {
       try {
-        if (facEmail && facEmail.includes('@')) {
-          rootFolder.addEditor(facEmail);
-          cadetFolder.addEditor(facEmail);
+        const cleanFacEmail = (facEmail || '').toLowerCase().trim();
+        if (cleanFacEmail && cleanFacEmail.includes('@') && cleanFacEmail !== cadetEmailToExclude) {
+          rootFolder.addEditor(cleanFacEmail);
+          cadetFolder.addEditor(cleanFacEmail);
         }
       } catch (shareErr) {
-        console.warn(`Could not add editor ${facEmail}:`, shareErr);
+        console.warn(`Could not add faculty editor ${facEmail}:`, shareErr);
       }
     });
 
@@ -745,19 +740,13 @@ function getOrCreateRootFolder(folderName) {
     folder = DriveApp.createFolder(safeName);
   }
 
-  // Ensure Root Folder is viewable by anyone with the link
-  try {
-    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (e) {
-    console.warn('Could not set link sharing on root folder:', e);
-  }
-
-  // Add default configured faculty emails as editors to the root folder
+  // Folders are kept private to authorized institutional faculty; link sharing is disabled
+  // Add default configured faculty emails as editors to the root folder (never student email)
   if (Array.isArray(FORWARD_EMAILS)) {
     FORWARD_EMAILS.forEach(email => {
       try {
         if (email && email.includes('@')) {
-          folder.addEditor(email);
+          folder.addEditor(email.trim());
         }
       } catch (_) {}
     });
@@ -767,7 +756,7 @@ function getOrCreateRootFolder(folderName) {
 }
 
 /**
- * Gets or creates a child folder inside a parent folder with shared permissions
+ * Gets or creates a child folder inside a parent folder (private, no public link sharing)
  */
 function getOrCreateSubFolder(parentFolder, childFolderName) {
   const safeName = (childFolderName || 'General').trim();
@@ -777,13 +766,6 @@ function getOrCreateSubFolder(parentFolder, childFolderName) {
     folder = folders.next();
   } else {
     folder = parentFolder.createFolder(safeName);
-  }
-
-  // Ensure subfolder is viewable by anyone with the link
-  try {
-    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (e) {
-    console.warn('Could not set link sharing on subfolder:', e);
   }
 
   return folder;
@@ -1131,11 +1113,6 @@ function testDriveHierarchyAndMailing() {
  */
 function shareRootFolderWithFaculties() {
   const root = getOrCreateRootFolder(ROOT_FOLDER_NAME);
-  try {
-    root.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (e) {
-    console.warn('Could not set link sharing:', e);
-  }
 
   FORWARD_EMAILS.forEach(em => {
     try {

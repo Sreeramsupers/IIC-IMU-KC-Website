@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Poppins, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
@@ -15,6 +15,13 @@ const jetbrainsMono = JetBrains_Mono({
 	weight: ['400', '600', '700'],
 	display: 'swap',
 });
+
+export const viewport: Viewport = {
+	width: 'device-width',
+	initialScale: 1,
+	maximumScale: 5,
+	themeColor: '#FFFFFF',
+};
 
 export const metadata: Metadata = {
 	title: 'IMU Kolkata Campus | Institution’s Innovation Council (IIC 2026–27)',
@@ -42,8 +49,8 @@ export default function RootLayout({
 				<link
 					rel='preload'
 					as='image'
-					href='/iic-banner-v5.png'
-					type='image/png'
+					href='/iic-banner-v5.webp'
+					type='image/webp'
 					fetchPriority='high'
 				/>
 			</head>

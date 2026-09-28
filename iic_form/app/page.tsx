@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, FormEvent, ChangeEvent, FocusEvent } from 'react';
 import Image from 'next/image';
-import confetti from 'canvas-confetti';
 import {
 	User,
 	GraduationCap,
@@ -286,30 +285,31 @@ export default function Home() {
 		}
 	}, []);
 
-	// Auto-save text draft to localStorage (excluding binary dataUrls)
+	// Auto-save text draft to localStorage (debounced 700ms to eliminate typing latency)
 	useEffect(() => {
 		if (submitted) return;
-		try {
-			const safeData: Partial<FormData> = { ...formData };
-			delete safeData.photoDataUrl;
-			delete safeData.resumeDataUrl;
-			delete safeData.marksheetDataUrl;
-			delete safeData.journalFileDataUrl;
-			delete safeData.patentFileDataUrl;
-			delete safeData.competitionFileDataUrl;
-			delete safeData.activityFileDataUrl;
-			delete safeData.achievementFileDataUrl;
-			delete safeData.leadershipFileDataUrl;
-			localStorage.setItem('iic_form_draft_v2', JSON.stringify(safeData));
-			const timer = setTimeout(() => {
+		const debounceTimer = setTimeout(() => {
+			try {
+				const safeData: Partial<FormData> = { ...formData };
+				delete safeData.photoDataUrl;
+				delete safeData.resumeDataUrl;
+				delete safeData.marksheetDataUrl;
+				delete safeData.journalFileDataUrl;
+				delete safeData.patentFileDataUrl;
+				delete safeData.competitionFileDataUrl;
+				delete safeData.activityFileDataUrl;
+				delete safeData.achievementFileDataUrl;
+				delete safeData.leadershipFileDataUrl;
+				localStorage.setItem('iic_form_draft_v2', JSON.stringify(safeData));
 				setDraftSaved(true);
-				const hideTimer = setTimeout(() => setDraftSaved(false), 2000);
+				const hideTimer = setTimeout(() => setDraftSaved(false), 2200);
 				return () => clearTimeout(hideTimer);
-			}, 0);
-			return () => clearTimeout(timer);
-		} catch {
-			// localStorage full or disabled
-		}
+			} catch {
+				// localStorage full or disabled
+			}
+		}, 700);
+
+		return () => clearTimeout(debounceTimer);
 	}, [formData, submitted]);
 
 	// Field-Level Validation Helper
@@ -1094,6 +1094,7 @@ export default function Home() {
 
 				// Fire celebratory confetti!
 				try {
+					const confetti = (await import('canvas-confetti')).default;
 					confetti({
 						particleCount: 130,
 						spread: 85,
@@ -1156,7 +1157,7 @@ export default function Home() {
 					<div className='w-full banner-frame-container p-2 sm:p-5 flex justify-center'>
 						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden banner-frame-inner bg-white'>
 							<Image
-								src='/iic-banner-v5.png'
+								src='/iic-banner-v5.webp'
 								alt='IMU Kolkata Campus - Institution Innovation Council (IIC) 2026-27'
 								width={2800}
 								height={600}
@@ -1440,7 +1441,7 @@ export default function Home() {
 							</nav>
 
 							{/* FORM BODY CONTAINER */}
-							<div className='p-5 sm:p-10 lg:p-12 space-y-8 sm:space-y-12'>
+							<div className='p-4 sm:p-10 lg:p-12 space-y-8 sm:space-y-12 pb-28 sm:pb-12'>
 								{/* ======================================================== */}
 								{/* SECTION 1: CADET PROFILE & DEMOGRAPHICS (Q1 - Q7 + PHOTO) */}
 								{/* ======================================================== */}
@@ -1606,6 +1607,9 @@ export default function Home() {
 														? 'Enter allotted Reg No. / Roll No.'
 														: 'Enter permanent University Reg No. / Roll No.'
 												}
+												autoCapitalize='characters'
+												autoCorrect='off'
+												spellCheck={false}
 												className={`form-input font-mono ${errors.regNumber && touched.regNumber ? 'input-error' : ''}`}
 											/>
 											{errors.regNumber && touched.regNumber ? (
@@ -1666,8 +1670,12 @@ export default function Home() {
 												onChange={handleChange}
 												onBlur={handleBlur}
 												placeholder='Enter your email'
-												className={`form-input ${errors.email && touched.email ? 'input-error' : ''}`}
 												autoComplete='email'
+												inputMode='email'
+												autoCapitalize='none'
+												autoCorrect='off'
+												spellCheck={false}
+												className={`form-input ${errors.email && touched.email ? 'input-error' : ''}`}
 											/>
 											{errors.email && touched.email && (
 												<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1 sm:mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
@@ -1692,8 +1700,9 @@ export default function Home() {
 												onChange={handleChange}
 												onBlur={handleBlur}
 												placeholder='10-digit mobile number'
-												className={`form-input font-mono ${errors.phone && touched.phone ? 'input-error' : ''}`}
 												autoComplete='tel'
+												inputMode='tel'
+												className={`form-input font-mono ${errors.phone && touched.phone ? 'input-error' : ''}`}
 											/>
 											{errors.phone && touched.phone && (
 												<p className='text-xs sm:text-sm font-semibold text-[#F87171] mt-1 sm:mt-1.5 flex items-center gap-1.5 animate-fadeIn'>
@@ -1816,6 +1825,7 @@ export default function Home() {
 													type='text'
 													id='cgpaInput'
 													name='cgpa'
+													inputMode='decimal'
 													disabled={isFirstYear}
 													value={isFirstYear ? 'N/A' : formData.cgpa}
 													onChange={handleChange}
@@ -1851,7 +1861,7 @@ export default function Home() {
 														Semester Marksheet Proof
 													</label>
 													<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
-														Combine and upload all semester's marksheet in a single PDF file
+														Compile and upload all semesters' marksheet in a single PDF file
 													</span>
 												</div>
 											</div>
@@ -2988,7 +2998,7 @@ export default function Home() {
 															</div>
 														) : (
 															<span className='text-xs sm:text-sm text-[#475569] font-medium'>
-																No file chosen yet. File Format: PDF (Max. 5MB)
+																No file chosen yet. File Format: PDF (Max.15MB)
 															</span>
 														)}
 													</div>
@@ -3128,6 +3138,52 @@ export default function Home() {
 												disabled={submitting}
 												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 bg-[#22C55E] hover:bg-[#16A34A] border-b-4 border-[#15803D] active:border-b-0 shadow-md'>
 												<ShieldCheck className='w-5 h-5' />
+												<span>
+													{submitting ? 'Submitting Application...' : 'Submit Enrollment Form'}
+												</span>
+											</button>
+										)}
+									</div>
+								</div>
+
+								{/* STICKY BOTTOM ACTION BAR FOR MOBILE (Thumb-friendly, fixed to viewport bottom) */}
+								<div className='fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E2E8F0] px-3.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:hidden shadow-[0_-4px_16px_rgba(15,23,42,0.08)] flex items-center justify-between gap-2.5'>
+									<div className='flex items-center gap-2 min-w-0'>
+										{currentStep > 1 ? (
+											<button
+												type='button'
+												onClick={prevStep}
+												className='btn-secondary min-h-[44px] px-3.5 py-2 text-xs font-bold flex items-center gap-1.5 flex-shrink-0'>
+												<ChevronLeft className='w-4 h-4' /> Previous
+											</button>
+										) : (
+											<button
+												type='button'
+												onClick={handleReset}
+												className='btn-secondary min-h-[44px] px-3 py-2 text-xs font-bold flex items-center gap-1.5 flex-shrink-0'>
+												<RotateCcw className='w-3.5 h-3.5' /> Clear Form
+											</button>
+										)}
+									</div>
+
+									<div className='flex items-center flex-shrink-0'>
+										{currentStep < 5 ? (
+											<button
+												key={`sticky-next-btn-step-${currentStep}`}
+												type='button'
+												onClick={(e) => nextStep(e)}
+												className='btn-primary min-h-[44px] px-4 py-2 text-xs font-bold flex items-center gap-1.5 shadow-sm'>
+												<span>Next: {SECTIONS[currentStep]?.title}</span>
+												<ChevronRight className='w-4 h-4' />
+											</button>
+										) : (
+											<button
+												key='sticky-submit-final-enrollment-btn'
+												type='button'
+												onClick={(e) => handleSubmit(e)}
+												disabled={submitting}
+												className='btn-primary min-h-[44px] px-4 py-2 text-xs font-bold flex items-center gap-1.5 bg-[#22C55E] hover:bg-[#16A34A] border-b-2 border-[#15803D] active:border-b-0 shadow-sm'>
+												<ShieldCheck className='w-4 h-4' />
 												<span>
 													{submitting ? 'Submitting Application...' : 'Submit Enrollment Form'}
 												</span>
