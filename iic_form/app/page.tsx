@@ -504,7 +504,7 @@ export default function Home() {
 				const img = new window.Image();
 				img.onload = () => {
 					const canvas = document.createElement('canvas');
-					const maxDim = 800;
+					const maxDim = 480;
 					let width = img.width;
 					let height = img.height;
 
@@ -525,7 +525,7 @@ export default function Home() {
 					const ctx = canvas.getContext('2d');
 					ctx?.drawImage(img, 0, 0, width, height);
 
-					const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+					const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.78);
 
 					setFormData((prev) => ({
 						...prev,
@@ -943,64 +943,66 @@ export default function Home() {
 				: 'Not Accepted';
 			const displayDate = new Date().toLocaleDateString('en-GB');
 
-			// Collect all uploaded proof files for single attachment PDF compilation
-			const attachedProofs: { name: string; type: string; dataUrl: string }[] = [];
+			// Collect metadata of uploaded proof files (avoid duplicating huge base64 strings in JSON payload)
+			const attachedProofs: { name: string; type: string }[] = [];
 			if (!isFirstYear && formData.marksheetDataUrl) {
 				attachedProofs.push({
 					name: formData.marksheetName || 'Semester_Marksheet.pdf',
 					type: 'marksheet',
-					dataUrl: formData.marksheetDataUrl,
 				});
 			}
 			if (formData.hasJournalPub && formData.journalFileDataUrl) {
 				attachedProofs.push({
 					name: formData.journalFileName || 'Journal_Publication.pdf',
 					type: 'journal',
-					dataUrl: formData.journalFileDataUrl,
 				});
 			}
 			if (formData.hasPatents && formData.patentFileDataUrl) {
 				attachedProofs.push({
 					name: formData.patentFileName || 'Patent_IPR_Document.pdf',
 					type: 'patent',
-					dataUrl: formData.patentFileDataUrl,
 				});
 			}
 			if (formData.hasCompetitions && formData.competitionFileDataUrl) {
 				attachedProofs.push({
 					name: formData.competitionFileName || 'Competition_Certificate.pdf',
 					type: 'competition',
-					dataUrl: formData.competitionFileDataUrl,
 				});
 			}
 			if (formData.hasActivities && formData.activityFileDataUrl) {
 				attachedProofs.push({
 					name: formData.activityFileName || 'Activity_Certificate.pdf',
 					type: 'activity',
-					dataUrl: formData.activityFileDataUrl,
 				});
 			}
 			if (formData.hasAchievements && formData.achievementFileDataUrl) {
 				attachedProofs.push({
 					name: formData.achievementFileName || 'Achievement_Certificate.pdf',
 					type: 'achievement',
-					dataUrl: formData.achievementFileDataUrl,
 				});
 			}
 			if (formData.hasLeadership && formData.leadershipFileDataUrl) {
 				attachedProofs.push({
 					name: formData.leadershipFileName || 'Leadership_Proof.pdf',
 					type: 'leadership',
-					dataUrl: formData.leadershipFileDataUrl,
 				});
 			}
 			if (formData.hasResume && formData.resumeDataUrl) {
 				attachedProofs.push({
 					name: formData.resumeName || 'Cadet_Resume.pdf',
 					type: 'resume',
-					dataUrl: formData.resumeDataUrl,
 				});
 			}
+
+			// Clean up inactive file data URLs so unneeded files are not included in transmission
+			const cleanMarksheetDataUrl = !isFirstYear ? formData.marksheetDataUrl : '';
+			const cleanJournalDataUrl = formData.hasJournalPub ? formData.journalFileDataUrl : '';
+			const cleanPatentDataUrl = formData.hasPatents ? formData.patentFileDataUrl : '';
+			const cleanCompetitionDataUrl = formData.hasCompetitions ? formData.competitionFileDataUrl : '';
+			const cleanActivityDataUrl = formData.hasActivities ? formData.activityFileDataUrl : '';
+			const cleanAchievementDataUrl = formData.hasAchievements ? formData.achievementFileDataUrl : '';
+			const cleanLeadershipDataUrl = formData.hasLeadership ? formData.leadershipFileDataUrl : '';
+			const cleanResumeDataUrl = formData.hasResume ? formData.resumeDataUrl : '';
 
 			// Faculty forwarding email list
 			const rawFacultyEmails =
@@ -1014,6 +1016,14 @@ export default function Home() {
 
 			const payload = {
 				...formData,
+				marksheetDataUrl: cleanMarksheetDataUrl,
+				journalFileDataUrl: cleanJournalDataUrl,
+				patentFileDataUrl: cleanPatentDataUrl,
+				competitionFileDataUrl: cleanCompetitionDataUrl,
+				activityFileDataUrl: cleanActivityDataUrl,
+				achievementFileDataUrl: cleanAchievementDataUrl,
+				leadershipFileDataUrl: cleanLeadershipDataUrl,
+				resumeDataUrl: cleanResumeDataUrl,
 				referenceId: generatedRefId,
 				submittedAt: new Date().toISOString(),
 				templateDocId: '1hljBhK-tPtYN31i8P4n9QCuCHsdm_PaFrrBmEP9QCDw',
@@ -1040,7 +1050,7 @@ export default function Home() {
 				declaration: declarationFormatted,
 				date: displayDate,
 
-				// Attached individual document proofs
+				// Attached individual document proofs (metadata only)
 				attachedProofs,
 				attachedProofsCount: attachedProofs.length,
 			};
@@ -1054,29 +1064,44 @@ export default function Home() {
 				.replace(/^h+ttps:\/\//i, 'https://');
 
 			let submissionSuccessful = false;
+			const jsonBody = JSON.stringify(payload);
+			// Calculate approximate payload size in MB
+			const payloadSizeMb = jsonBody.length / (1024 * 1024);
 
-			try {
-				const res = await fetch('/api/submit', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(payload),
-				});
-				if (res.ok) {
-					submissionSuccessful = true;
-				} else {
-					throw new Error('Serverless route returned status ' + res.status);
+			// Vercel serverless has a 4.5MB request payload limit.
+			// If payload is <= 4MB, attempt /api/submit with an 8-second timeout so it responds immediately via Next.js after().
+			// If payload > 4MB (many PDFs), skip /api/submit to avoid a guaranteed 413 error and post directly to Google Apps Script.
+			if (payloadSizeMb <= 4.0) {
+				try {
+					const controller = new AbortController();
+					const timeoutId = setTimeout(() => controller.abort(), 8000);
+					const res = await fetch('/api/submit', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: jsonBody,
+						signal: controller.signal,
+					});
+					clearTimeout(timeoutId);
+					if (res.ok) {
+						submissionSuccessful = true;
+					} else {
+						throw new Error('Serverless route returned status ' + res.status);
+					}
+				} catch (apiError) {
+					console.warn(
+						'API route fast path not completed, submitting directly to Google Apps Script:',
+						apiError,
+					);
 				}
-			} catch (apiError) {
-				console.warn(
-					'API route not reachable, submitting directly to Google Apps Script:',
-					apiError,
-				);
+			}
+
+			if (!submissionSuccessful) {
 				try {
 					await fetch(directGoogleUrl, {
 						method: 'POST',
 						mode: 'no-cors',
 						headers: { 'Content-Type': 'text/plain' },
-						body: JSON.stringify(payload),
+						body: jsonBody,
 					});
 					submissionSuccessful = true;
 				} catch (directErr) {
