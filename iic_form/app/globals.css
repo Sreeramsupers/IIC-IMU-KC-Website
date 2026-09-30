@@ -499,12 +499,13 @@ select:-webkit-autofill:focus {
 	font-weight: 600;
 	cursor: pointer;
 	min-height: 38px;
-	transition: all 0.16s var(--ease-standard);
+	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 	border: 1px solid #E2E8F0 !important;
 	background-color: #F8FAFC !important;
 	color: #334155 !important;
 	user-select: none;
 	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+	backface-visibility: hidden;
 }
 
 @media (min-width: 640px) {
@@ -521,8 +522,7 @@ select:-webkit-autofill:focus {
 	border-color: #93C5FD !important;
 	background-color: #EFF6FF !important;
 	color: #1D4ED8 !important;
-	transform: translateY(-1px);
-	box-shadow: 0 3px 8px rgba(29, 78, 216, 0.08);
+	box-shadow: 0 2px 6px rgba(29, 78, 216, 0.08);
 }
 
 .interest-tag-chip.active {
@@ -530,7 +530,6 @@ select:-webkit-autofill:focus {
 	background: #1D4ED8 !important;
 	color: #FFFFFF !important;
 	box-shadow: 0 2px 8px rgba(29, 78, 216, 0.25) !important;
-	transform: translateY(-1px);
 }
 
 /* Toggle Pills */
@@ -604,8 +603,9 @@ select:-webkit-autofill:focus {
 	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 3px 10px rgba(29, 78, 216, 0.22);
 	cursor: pointer;
 	touch-action: manipulation;
-	transition: all 0.16s var(--ease-standard);
+	transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
 	user-select: none;
+	backface-visibility: hidden;
 }
 
 @media (min-width: 640px) {
@@ -619,12 +619,11 @@ select:-webkit-autofill:focus {
 
 .btn-primary:hover:not(:disabled) {
 	background: #1E40AF !important;
-	box-shadow: 0 4px 14px rgba(29, 78, 216, 0.32);
-	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(29, 78, 216, 0.28);
 }
 
 .btn-primary:active:not(:disabled) {
-	transform: translateY(0);
+	transform: scale(0.99) !important;
 	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
 }
 
@@ -653,9 +652,10 @@ select:-webkit-autofill:focus {
 	border: 1px solid #CBD5E1 !important;
 	cursor: pointer;
 	touch-action: manipulation;
-	transition: all 0.16s var(--ease-standard);
+	transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
 	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 	user-select: none;
+	backface-visibility: hidden;
 }
 
 @media (min-width: 640px) {
@@ -672,11 +672,36 @@ select:-webkit-autofill:focus {
 	color: #0F172A !important;
 	border-color: #94A3B8 !important;
 	box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
-	transform: translateY(-1px);
 }
 
 .btn-secondary:active:not(:disabled) {
-	transform: translateY(0);
+	transform: scale(0.99) !important;
+}
+
+/* ==========================================================================
+   STABLE INTERACTIVE BUTTON & HOVER ARCHITECTURE (ZERO JITTER / ANTI-GLITCH)
+   ========================================================================== */
+button,
+[role="button"],
+.btn-primary,
+.btn-secondary,
+.interest-tag-chip,
+.stepper-btn {
+	-webkit-tap-highlight-color: transparent;
+	backface-visibility: hidden;
+	-webkit-font-smoothing: subpixel-antialiased;
+}
+
+/* Ensure no button shifts coordinates on hover to eliminate boundary jitter */
+button:hover,
+[role="button"]:hover {
+	transform: none;
+}
+
+/* Clean, crisp tactile press feedback exclusively on active click */
+button:active:not(:disabled),
+[role="button"]:active:not(:disabled) {
+	transform: scale(0.99);
 }
 
 /* Slim Precision Progress Bar */
@@ -788,6 +813,21 @@ select:-webkit-autofill:focus {
 
 	.no-print {
 		display: none !important;
+	}
+
+	#printable-application-form,
+	#printable-application-form * {
+		visibility: visible !important;
+	}
+
+	#printable-application-form {
+		position: static !important;
+		width: 100% !important;
+		max-width: 100% !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		background: #ffffff !important;
+		color: #000000 !important;
 	}
 }
 

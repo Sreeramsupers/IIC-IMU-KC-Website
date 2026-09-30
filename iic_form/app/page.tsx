@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, FormEvent, ChangeEvent, FocusEvent } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
 	User,
 	GraduationCap,
@@ -1255,7 +1256,7 @@ export default function Home() {
 									<button
 										type='button'
 										onClick={() => setNoticeExpanded(!noticeExpanded)}
-										className='sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#DBEAFE] text-[#1D4ED8] text-xs font-bold hover:bg-[#BFDBFE] transition-all cursor-pointer'>
+										className='sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#DBEAFE] text-[#1D4ED8] text-xs font-bold hover:bg-[#BFDBFE] transition-colors cursor-pointer'>
 										{noticeExpanded ? (
 											<>
 												<span>Hide</span>
@@ -1340,7 +1341,7 @@ export default function Home() {
 										}
 										target='_blank'
 										rel='noopener noreferrer'
-										className='inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl font-semibold text-sm sm:text-base text-white bg-[#16A34A] hover:bg-[#15803D] active:scale-[0.99] transition-all shadow-sm hover:shadow-md'>
+										className='inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl font-semibold text-sm sm:text-base text-white bg-[#16A34A] hover:bg-[#15803D] active:scale-[0.99] transition-colors shadow-sm hover:shadow-md'>
 										<span>Join IIC WhatsApp Group</span>
 										<ChevronRight className='w-4 h-4' />
 									</a>
@@ -1397,16 +1398,16 @@ export default function Home() {
 													aria-selected={isCurrent}
 													aria-label={`Step ${sec.id}: ${sec.title} (${isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Pending'})`}
 													title={`Go to Step ${sec.id}: ${sec.title}`}
-													className={`group relative flex-shrink-0 sm:flex-shrink min-h-[52px] h-13 px-3 sm:px-2 rounded-xl flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer touch-manipulation select-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:outline-none ${
+													className={`group relative flex-shrink-0 sm:flex-shrink min-h-[52px] h-13 px-3 sm:px-2 rounded-xl flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-colors duration-150 cursor-pointer touch-manipulation select-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:outline-none ${
 														isCurrent
-															? 'bg-[#1D4ED8] text-white shadow-sm ring-1 ring-[#1E40AF] font-bold'
+															? 'bg-[#1D4ED8] text-white shadow-sm border border-[#1E40AF] font-bold'
 															: isCompleted
 																? 'bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0] hover:bg-[#DCFCE7] shadow-xs'
 																: 'bg-white text-[#64748B] border border-[#E2E8F0] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] shadow-xs'
 													}`}>
 													{/* Step Number or Check Badge */}
 													<div
-														className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 pointer-events-none transition-transform ${
+														className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 pointer-events-none transition-colors ${
 															isCurrent
 																? 'bg-white text-[#1D4ED8] shadow-xs'
 																: isCompleted
@@ -1678,7 +1679,7 @@ export default function Home() {
 												{['Male', 'Female'].map((g) => (
 													<label
 														key={g}
-														className={`flex-1 text-center h-full min-h-[38px] sm:min-h-[44px] flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer touch-manipulation transition-all ${
+														className={`flex-1 text-center h-full min-h-[38px] sm:min-h-[44px] flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer touch-manipulation transition-colors ${
 															formData.gender === g
 																? 'bg-[#3B82F6] text-white shadow-xs'
 																: 'text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F5F9]'
@@ -1786,7 +1787,7 @@ export default function Home() {
 												</div>
 											)}
 											<div className='flex-1 min-w-[180px]'>
-												<label className='btn-secondary inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all'>
+												<label className='btn-secondary inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors'>
 													<Upload className='w-4 h-4 text-[#3B82F6]' />
 													<span>{formData.photoName ? 'Change Photo' : 'Select Photo'}</span>
 													<input
@@ -1934,7 +1935,7 @@ export default function Home() {
 														className={`upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl ${
 															formData.marksheetName ? 'has-file' : ''
 														}`}>
-														<label className='btn-secondary inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+														<label className='btn-secondary inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors flex-shrink-0'>
 															<Upload className='w-4 h-4 text-[#3B82F6]' />
 															<span>
 																{formData.marksheetName
@@ -2069,7 +2070,7 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
-													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors flex-shrink-0'>
 														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>{formData.journalFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
@@ -2193,7 +2194,7 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
-													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors flex-shrink-0'>
 														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>{formData.patentFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
@@ -2324,7 +2325,7 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
-													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors flex-shrink-0'>
 														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>
 															{formData.competitionFileName ? 'Change PDF' : 'Upload PDF'}
@@ -2486,7 +2487,7 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
-													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors flex-shrink-0'>
 														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>{formData.activityFileName ? 'Change PDF' : 'Upload PDF'}</span>
 														<input
@@ -2616,7 +2617,7 @@ export default function Home() {
 												</div>
 
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl'>
-													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0'>
+													<label className='btn-secondary inline-flex items-center gap-2.5 px-6 py-3.5 border border-[#CBD5E1] rounded-2xl text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors flex-shrink-0'>
 														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>
 															{formData.achievementFileName ? 'Change PDF' : 'Upload PDF'}
@@ -3005,7 +3006,7 @@ export default function Home() {
 										{formData.hasResume && (
 											<div className='pt-3.5 space-y-3.5 border-t border-[#E2E8F0] animate-fadeIn'>
 												<div className='upload-dropzone flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl'>
-													<label className='inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3.5 border-2 border-[#CBD5E1] rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-all flex-shrink-0 hover:border-[#3B82F6] min-h-[44px] sm:min-h-[50px]'>
+													<label className='inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3.5 border-2 border-[#CBD5E1] rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wider text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors flex-shrink-0 hover:border-[#3B82F6] min-h-[44px] sm:min-h-[50px]'>
 														<Upload className='w-4 h-4 text-[#3B82F6]' />
 														<span>
 															{formData.resumeName ? 'Change Resume PDF' : 'Upload Resume PDF'}
@@ -3084,7 +3085,7 @@ export default function Home() {
 										</div>
 
 										{/* Declaration Consent Checkbox */}
-										<label className='flex items-start gap-3 p-3.5 sm:p-5 rounded-2xl border-2 border-[#CBD5E1] bg-white hover:border-[#3B82F6] cursor-pointer transition-all shadow-xs min-h-[48px] sm:min-h-[56px]'>
+										<label className='flex items-start gap-3 p-3.5 sm:p-5 rounded-2xl border-2 border-[#CBD5E1] bg-white hover:border-[#3B82F6] cursor-pointer transition-colors shadow-xs min-h-[48px] sm:min-h-[56px]'>
 											<input
 												type='checkbox'
 												name='declarationAccepted'
@@ -3243,10 +3244,15 @@ export default function Home() {
 				</div>
 
 				{/* Footer note */}
-				<p className='text-center text-xs sm:text-sm text-[#475569] font-bold uppercase tracking-wider mt-6 select-none'>
-					Indian Maritime University • Kolkata Campus • IIC 2026–27
-				</p>
-				<p aria-hidden='true' className='text-center opacity-0'>
+				<div className='flex items-center justify-center gap-3 mt-6 flex-wrap text-center'>
+					<p className='text-xs sm:text-sm text-[#475569] font-bold uppercase tracking-wider select-none'>
+						Indian Maritime University • Kolkata Campus • IIC 2026–27
+					</p>
+					<span className='text-slate-300 hidden sm:inline'>•</span>
+				</div>
+				<p
+					aria-hidden='true'
+					className='text-center text-xs sm:text-sm text-[#94A3B8] font-medium mt-1.5 select-none opacity-0'>
 					Developed by Sreeram R
 				</p>
 			</div>
