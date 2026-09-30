@@ -39,9 +39,24 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
+		// Validation: Passport Size Photograph is mandatory for ALL cadets
+		if (
+			!data.photoDataUrl ||
+			typeof data.photoDataUrl !== 'string' ||
+			!data.photoDataUrl.startsWith('data:image/')
+		) {
+			return NextResponse.json(
+				{
+					success: false,
+					error: 'Passport size photograph is mandatory. Please upload a clear photo.',
+				},
+				{ status: 400 },
+			);
+		}
+
 		// Validation: Marksheet PDF is mandatory for 2nd, 3rd, and 4th year cadets
 		const isFirstYear = data.yearOfStudy === '1st Year' || data.semester === 'Semester 1';
-		if (!isFirstYear && !data.marksheetDataUrl && !data.marksheetName) {
+		if (!isFirstYear && (!data.marksheetDataUrl || typeof data.marksheetDataUrl !== 'string' || !data.marksheetDataUrl.startsWith('data:'))) {
 			return NextResponse.json(
 				{
 					success: false,

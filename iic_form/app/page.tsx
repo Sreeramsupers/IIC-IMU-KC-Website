@@ -262,19 +262,38 @@ export default function Home() {
 					? parsed.semester
 					: validSemesters[0];
 
+				// Only preserve photo if the actual image data URL is valid
+				const validPhotoData =
+					parsed.photoDataUrl &&
+					typeof parsed.photoDataUrl === 'string' &&
+					parsed.photoDataUrl.startsWith('data:image/')
+						? parsed.photoDataUrl
+						: '';
+				const validPhotoName = validPhotoData ? parsed.photoName || 'passport_photo.jpg' : '';
+
 				const timer = setTimeout(() => {
 					setFormData((prev) => ({
 						...prev,
 						...parsed,
 						semester: syncedSemester,
-						photoDataUrl: '',
+						photoName: validPhotoName,
+						photoDataUrl: validPhotoData,
+						// PDFs cannot be stored in localStorage; clear filenames so ghost checks never appear
+						resumeName: '',
 						resumeDataUrl: '',
+						marksheetName: '',
 						marksheetDataUrl: '',
+						journalFileName: '',
 						journalFileDataUrl: '',
+						patentFileName: '',
 						patentFileDataUrl: '',
+						competitionFileName: '',
 						competitionFileDataUrl: '',
+						activityFileName: '',
 						activityFileDataUrl: '',
+						achievementFileName: '',
 						achievementFileDataUrl: '',
+						leadershipFileName: '',
 						leadershipFileDataUrl: '',
 					}));
 				}, 0);
@@ -287,22 +306,52 @@ export default function Home() {
 
 	const hideDraftSavedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-	// Auto-save text draft to localStorage (debounced 700ms to eliminate typing latency)
+	// Auto-save draft to localStorage (debounced 700ms to eliminate typing latency)
 	useEffect(() => {
 		if (submitted) return;
 		const debounceTimer = setTimeout(() => {
 			try {
 				const safeData: Partial<FormData> = { ...formData };
-				delete safeData.photoDataUrl;
+
+				// Compressed passport photo (~30KB) can safely be saved in localStorage
+				if (
+					formData.photoDataUrl &&
+					formData.photoDataUrl.startsWith('data:image/') &&
+					formData.photoDataUrl.length < 350 * 1024
+				) {
+					safeData.photoDataUrl = formData.photoDataUrl;
+					safeData.photoName = formData.photoName;
+				} else {
+					delete safeData.photoDataUrl;
+					delete safeData.photoName;
+				}
+
+				// PDFs are too large for localStorage quota; omit both dataUrl and filename
 				delete safeData.resumeDataUrl;
+				delete safeData.resumeName;
 				delete safeData.marksheetDataUrl;
+				delete safeData.marksheetName;
 				delete safeData.journalFileDataUrl;
+				delete safeData.journalFileName;
 				delete safeData.patentFileDataUrl;
+				delete safeData.patentFileName;
 				delete safeData.competitionFileDataUrl;
+				delete safeData.competitionFileName;
 				delete safeData.activityFileDataUrl;
+				delete safeData.activityFileName;
 				delete safeData.achievementFileDataUrl;
+				delete safeData.achievementFileName;
 				delete safeData.leadershipFileDataUrl;
-				localStorage.setItem('iic_form_draft_v2', JSON.stringify(safeData));
+				delete safeData.leadershipFileName;
+
+				try {
+					localStorage.setItem('iic_form_draft_v2', JSON.stringify(safeData));
+				} catch (storageErr) {
+					// Fallback if quota is constrained: strip photo as well
+					delete safeData.photoDataUrl;
+					delete safeData.photoName;
+					localStorage.setItem('iic_form_draft_v2', JSON.stringify(safeData));
+				}
 
 				// Show "Auto-Saved" badge for 12 seconds (12000ms, within 10 to 15 seconds)
 				setDraftSaved(true);
@@ -376,19 +425,27 @@ export default function Home() {
 			case 'marksheet':
 			case 'marksheetFile': {
 				if (!isFirstYear) {
-					if (!formData.marksheetDataUrl && !formData.marksheetName) {
-						return 'Semester marksheet PDF is required. Please upload your marksheet.';
+					const dataUrl = typeof value === 'string' ? value : formData.marksheetDataUrl;
+					if (!dataUrl || !formData.marksheetName || !dataUrl.startsWith('data:')) {
+						return 'Semester marksheet PDF is mandatory. Please upload your marksheet PDF.';
 					}
 				}
 				return '';
 			}
 			case 'photo': {
-				if (!formData.photoName) return 'Passport size photo is required. Please select an image.';
+				const dataUrl = typeof value === 'string' ? value : formData.photoDataUrl;
+				if (!dataUrl || !formData.photoName || !dataUrl.startsWith('data:image/')) {
+					return 'Passport size photograph is mandatory. Please select and upload a clear photo.';
+				}
 				return '';
 			}
 			case 'resume': {
-				if (formData.hasResume && !formData.resumeName)
-					return 'Please upload your Resume / CV (PDF), or select NIL.';
+				if (formData.hasResume) {
+					const dataUrl = typeof value === 'string' ? value : formData.resumeDataUrl;
+					if (!dataUrl || !formData.resumeName || !dataUrl.startsWith('data:')) {
+						return 'Please upload your Resume / CV (PDF), or select NIL.';
+					}
+				}
 				return '';
 			}
 			case 'problemMaritime': {
@@ -513,27 +570,58 @@ export default function Home() {
 	// Passport photo change with automatic image resizing (max 5MB)
 	const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
-		if (file) {
-			if (!file.type.startsWith('image/')) {
+		if (!file) return;
+
+		const validExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+		const hasValidExt = validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
+		const isImage = file.type.startsWith('image/') || hasValidExt;
+
+		if (!isImage) {
+			setErrors((prev) => ({
+				...prev,
+				photo: 'Please select a valid image file (PNG, JPG, JPEG, WEBP).',
+			}));
+			return;
+		}
+		if (file.size > 5 * 1024 * 1024) {
+			setErrors((prev) => ({ ...prev, photo: 'Image size must be under 5MB.' }));
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onerror = () => {
+			setErrors((prev) => ({
+				...prev,
+				photo: 'Failed to read the selected image file. Please try again.',
+			}));
+		};
+		reader.onload = (event) => {
+			const resultStr = event.target?.result as string;
+			if (!resultStr) {
 				setErrors((prev) => ({
 					...prev,
-					photo: 'Please select a valid image file (PNG, JPG, JPEG).',
+					photo: 'Failed to read image data. Please select another file.',
 				}));
 				return;
 			}
-			if (file.size > 5 * 1024 * 1024) {
-				setErrors((prev) => ({ ...prev, photo: 'Image size must be under 5MB.' }));
-				return;
-			}
-
-			const reader = new FileReader();
-			reader.onload = (event) => {
-				const img = new window.Image();
-				img.onload = () => {
+			const img = new window.Image();
+			img.onerror = () => {
+				setErrors((prev) => ({
+					...prev,
+					photo: 'Could not decode image. Please upload a standard JPG, JPEG, or PNG photo.',
+				}));
+				setFormData((prev) => ({ ...prev, photoName: '', photoDataUrl: '' }));
+			};
+			img.onload = () => {
+				try {
 					const canvas = document.createElement('canvas');
 					const maxDim = 480;
 					let width = img.width;
 					let height = img.height;
+
+					if (width <= 0 || height <= 0) {
+						throw new Error('Invalid image dimensions');
+					}
 
 					if (width > height) {
 						if (width > maxDim) {
@@ -550,21 +638,32 @@ export default function Home() {
 					canvas.width = width;
 					canvas.height = height;
 					const ctx = canvas.getContext('2d');
-					ctx?.drawImage(img, 0, 0, width, height);
+					if (!ctx) throw new Error('Could not get 2D canvas context');
+					ctx.drawImage(img, 0, 0, width, height);
 
 					const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.78);
+					if (!compressedDataUrl || !compressedDataUrl.startsWith('data:image/') || compressedDataUrl.length < 200) {
+						throw new Error('Image data compression failed');
+					}
 
 					setFormData((prev) => ({
 						...prev,
 						photoName: file.name,
 						photoDataUrl: compressedDataUrl,
 					}));
-				};
-				img.src = event.target?.result as string;
+					setErrors((prev) => ({ ...prev, photo: '' }));
+				} catch (canvasErr) {
+					console.error('Image processing failure:', canvasErr);
+					setErrors((prev) => ({
+						...prev,
+						photo: 'Could not process photo format. Please select a standard JPG or PNG.',
+					}));
+					setFormData((prev) => ({ ...prev, photoName: '', photoDataUrl: '' }));
+				}
 			};
-			reader.readAsDataURL(file);
-			setErrors((prev) => ({ ...prev, photo: '' }));
-		}
+			img.src = resultStr;
+		};
+		reader.readAsDataURL(file);
 	};
 
 	// Generic PDF upload handler (max 15MB)
@@ -640,7 +739,7 @@ export default function Home() {
 			const regErr = validateField('regNumber', formData.regNumber);
 			const emailErr = validateField('email', formData.email);
 			const phoneErr = validateField('phone', formData.phone);
-			const photoErr = validateField('photo', formData.photoName);
+			const photoErr = validateField('photo', formData.photoDataUrl);
 			return !nameErr && !regErr && !emailErr && !phoneErr && !photoErr;
 		}
 		if (stepNumber === 2) {
@@ -685,7 +784,7 @@ export default function Home() {
 			return !maritimeErr && !societyErr && !areasErr;
 		}
 		if (stepNumber === 5) {
-			if (formData.hasResume && !formData.resumeName) return false;
+			if (formData.hasResume && (!formData.resumeName || !formData.resumeDataUrl)) return false;
 			const decErr = validateField('declarationAccepted', formData.declarationAccepted);
 			return !decErr;
 		}
@@ -709,7 +808,7 @@ export default function Home() {
 			const phoneErr = validateField('phone', formData.phone);
 			if (phoneErr) newErrors.phone = phoneErr;
 
-			const photoErr = validateField('photo', formData.photoName);
+			const photoErr = validateField('photo', formData.photoDataUrl);
 			if (photoErr) newErrors.photo = photoErr;
 		}
 
@@ -784,7 +883,7 @@ export default function Home() {
 		}
 
 		if (stepNumber === 5) {
-			if (formData.hasResume && !formData.resumeName) {
+			if (formData.hasResume && (!formData.resumeName || !formData.resumeDataUrl)) {
 				newErrors.resume = 'Please upload your Resume / CV (PDF), or select NIL.';
 			}
 
@@ -898,6 +997,35 @@ export default function Home() {
 					firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
 				}
 			}, 80);
+			return;
+		}
+
+		// Fail-safe preflight guard: verify mandatory photo and non-first-year marksheet
+		if (
+			!formData.photoDataUrl ||
+			!formData.photoDataUrl.startsWith('data:image/') ||
+			!formData.photoName
+		) {
+			setCurrentStep(1);
+			setErrors((prev) => ({
+				...prev,
+				photo: 'Passport size photograph is mandatory. Please select and upload a clear photo.',
+			}));
+			setTouched((prev) => ({ ...prev, photo: true }));
+			setTimeout(() => {
+				const photoElem = document.getElementById('photoInput');
+				if (photoElem) photoElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}, 80);
+			return;
+		}
+
+		if (!isFirstYear && (!formData.marksheetDataUrl || !formData.marksheetName)) {
+			setCurrentStep(2);
+			setErrors((prev) => ({
+				...prev,
+				marksheetFile: 'Semester marksheet PDF is mandatory. Please upload your marksheet PDF.',
+			}));
+			setTouched((prev) => ({ ...prev, marksheetFile: true }));
 			return;
 		}
 
@@ -1805,7 +1933,7 @@ export default function Home() {
 											<div className='flex-1 min-w-[180px]'>
 												<label className='btn-secondary inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-[#0F172A] bg-white hover:bg-[#F8FAFC] cursor-pointer shadow-xs transition-colors'>
 													<Upload className='w-4 h-4 text-[#3B82F6]' />
-													<span>{formData.photoName ? 'Change Photo' : 'Select Photo'}</span>
+													<span>{formData.photoDataUrl && formData.photoName ? 'Change Photo' : 'Select Photo'}</span>
 													<input
 														type='file'
 														id='photoInput'
@@ -1816,7 +1944,7 @@ export default function Home() {
 													/>
 												</label>
 												<p className='text-xs sm:text-sm text-[#475569] font-medium truncate mt-2'>
-													{formData.photoName ? (
+													{formData.photoDataUrl && formData.photoName ? (
 														<span className='font-bold text-[#166534] flex items-center gap-1.5'>
 															<Check className='w-4 h-4 text-[#16A34A]' /> {formData.photoName}
 														</span>
