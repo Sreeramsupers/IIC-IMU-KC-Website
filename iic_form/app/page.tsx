@@ -998,9 +998,13 @@ export default function Home() {
 			const cleanMarksheetDataUrl = !isFirstYear ? formData.marksheetDataUrl : '';
 			const cleanJournalDataUrl = formData.hasJournalPub ? formData.journalFileDataUrl : '';
 			const cleanPatentDataUrl = formData.hasPatents ? formData.patentFileDataUrl : '';
-			const cleanCompetitionDataUrl = formData.hasCompetitions ? formData.competitionFileDataUrl : '';
+			const cleanCompetitionDataUrl = formData.hasCompetitions
+				? formData.competitionFileDataUrl
+				: '';
 			const cleanActivityDataUrl = formData.hasActivities ? formData.activityFileDataUrl : '';
-			const cleanAchievementDataUrl = formData.hasAchievements ? formData.achievementFileDataUrl : '';
+			const cleanAchievementDataUrl = formData.hasAchievements
+				? formData.achievementFileDataUrl
+				: '';
 			const cleanLeadershipDataUrl = formData.hasLeadership ? formData.leadershipFileDataUrl : '';
 			const cleanResumeDataUrl = formData.hasResume ? formData.resumeDataUrl : '';
 
@@ -1886,7 +1890,7 @@ export default function Home() {
 														Semester Marksheet Proof
 													</label>
 													<span className='text-xs sm:text-sm text-[#475569] font-medium block mt-1'>
-														Compile and upload all semesters' marksheet in a single PDF file
+														Compile and upload all semester marksheets in a single PDF file
 													</span>
 												</div>
 											</div>
