@@ -285,6 +285,8 @@ export default function Home() {
 		}
 	}, []);
 
+	const hideDraftSavedTimerRef = useRef<NodeJS.Timeout | null>(null);
+
 	// Auto-save text draft to localStorage (debounced 700ms to eliminate typing latency)
 	useEffect(() => {
 		if (submitted) return;
@@ -301,9 +303,15 @@ export default function Home() {
 				delete safeData.achievementFileDataUrl;
 				delete safeData.leadershipFileDataUrl;
 				localStorage.setItem('iic_form_draft_v2', JSON.stringify(safeData));
+
+				// Show "Auto-Saved" badge for 2 to 3 seconds (3000ms)
 				setDraftSaved(true);
-				const hideTimer = setTimeout(() => setDraftSaved(false), 2200);
-				return () => clearTimeout(hideTimer);
+				if (hideDraftSavedTimerRef.current) {
+					clearTimeout(hideDraftSavedTimerRef.current);
+				}
+				hideDraftSavedTimerRef.current = setTimeout(() => {
+					setDraftSaved(false);
+				}, 3000);
 			} catch {
 				// localStorage full or disabled
 			}
@@ -311,6 +319,15 @@ export default function Home() {
 
 		return () => clearTimeout(debounceTimer);
 	}, [formData, submitted]);
+
+	// Cleanup timer on unmount
+	useEffect(() => {
+		return () => {
+			if (hideDraftSavedTimerRef.current) {
+				clearTimeout(hideDraftSavedTimerRef.current);
+			}
+		};
+	}, []);
 
 	// Field-Level Validation Helper
 	const validateField = (name: string, value: unknown): string => {
@@ -1128,7 +1145,7 @@ export default function Home() {
 						particleCount: 130,
 						spread: 85,
 						origin: { y: 0.6 },
-						colors: ['#3B82F6', '#FBBF24', '#22C55E', '#A855F7', '#60A5FA'],
+						colors: ['#1D4ED8', '#2563EB', '#D97706', '#059669', '#0F172A'],
 					});
 				} catch {
 					// Ignore confetti error
@@ -1172,19 +1189,19 @@ export default function Home() {
 	const progressPercent = Math.round((completedCount / 5) * 100);
 
 	return (
-		<main className='relative w-full min-h-screen py-6 sm:py-12 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start skylearn-pattern bg-white'>
-			{/* Ambient Radial Lighting Overlay */}
-			<div className='pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(59,130,246,0.1),rgba(255,255,255,0))]' />
+		<main className='relative w-full min-h-screen py-6 sm:py-12 px-3 sm:px-6 lg:px-8 flex flex-col items-center justify-start institutional-grid bg-[#F8FAFC]'>
+			{/* Ambient Subtle Maritime Illumination */}
+			<div className='pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_0%,rgba(29,78,216,0.05),transparent)]' />
 
-			{/* Form Shell / Center Card (Max-w-5xl, 28px Radius) */}
+			{/* Form Shell / Center Card (Max-w-5xl, 20px Radius) */}
 			<div className='relative z-10 w-full max-w-5xl mb-12 mt-1 sm:mt-2'>
 				<div className='clean-card overflow-hidden'>
-					{/* Skylearn Brand Accent Bar: Sky, Sun & Leaf */}
-					<div className='h-2 w-full bg-gradient-to-r from-[#3B82F6] via-[#FBBF24] to-[#22C55E]' />
+					{/* Sovereign Maritime Institutional Bar */}
+					<div className='h-1.5 w-full bg-gradient-to-r from-[#0A192F] via-[#1E3A8A] to-[#2563EB] border-b border-[#F59E0B]' />
 
 					{/* Official Banner Header with Frame */}
 					<div className='w-full banner-frame-container p-2 sm:p-5 flex justify-center'>
-						<div className='w-full max-w-[1024px] relative rounded-2xl overflow-hidden banner-frame-inner bg-white'>
+						<div className='w-full max-w-[1024px] relative rounded-xl overflow-hidden banner-frame-inner bg-white'>
 							<Image
 								src='/iic-banner-v5.webp'
 								alt='IMU Kolkata Campus - Institution Innovation Council (IIC) 2026-27'
@@ -1207,11 +1224,11 @@ export default function Home() {
 										Academic Year 2026–27
 									</span>
 									<span className='inline-flex items-center gap-1 text-xs sm:text-sm font-bold campus-badge uppercase tracking-wider'>
-										<Building2 className='w-4 h-4 opacity-75 text-[#3B82F6]' />
+										<Building2 className='w-4 h-4 opacity-75 text-[#1D4ED8]' />
 										IMU - Kolkata Campus
 									</span>
 								</div>
-								<h1 className='text-base sm:text-2xl lg:text-[28px] font-extrabold uppercase tracking-tight leading-tight main-title font-heading'>
+								<h1 className='text-base sm:text-2xl lg:text-[26px] font-bold tracking-tight leading-tight main-title font-heading'>
 									Institution’s Innovation Council (IIC) – Cadet Enrollment Form
 								</h1>
 							</div>
@@ -1225,10 +1242,10 @@ export default function Home() {
 
 						{/* Instructions to Cadets Banner (Visible only before submission) */}
 						{!submitted && (
-							<div className='mt-5 p-4 sm:p-6 rounded-2xl notice-card'>
+							<div className='mt-5 p-4 sm:p-6 rounded-xl notice-card'>
 								<div className='flex items-center justify-between gap-3 pb-3 sm:pb-3.5 sm:mb-3 sm:border-b sm:border-[#DBEAFE]'>
 									<div className='flex items-center gap-2.5 min-w-0'>
-										<div className='w-7 h-7 sm:w-8 sm:h-8 rounded-xl notice-header-badge flex items-center justify-center flex-shrink-0 shadow-xs'>
+										<div className='w-7 h-7 sm:w-8 sm:h-8 rounded-lg notice-header-badge flex items-center justify-center flex-shrink-0 shadow-xs'>
 											<Info className='w-4 h-4' />
 										</div>
 										<h2 className='font-bold uppercase tracking-wider text-sm sm:text-base notice-title truncate'>
@@ -1323,7 +1340,7 @@ export default function Home() {
 										}
 										target='_blank'
 										rel='noopener noreferrer'
-										className='inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl font-bold text-sm sm:text-base text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] transition-all shadow-md shadow-[#25D366]/25 border-b-4 border-[#16A34A] active:border-b-0'>
+										className='inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl font-semibold text-sm sm:text-base text-white bg-[#16A34A] hover:bg-[#15803D] active:scale-[0.99] transition-all shadow-sm hover:shadow-md'>
 										<span>Join IIC WhatsApp Group</span>
 										<ChevronRight className='w-4 h-4' />
 									</a>
@@ -1334,7 +1351,7 @@ export default function Home() {
 									<button
 										type='button'
 										onClick={handleReset}
-										className='btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl font-bold text-sm'>
+										className='btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-sm'>
 										<RotateCcw className='w-4 h-4' /> Submit Another Form
 									</button>
 								</div>
@@ -1380,21 +1397,21 @@ export default function Home() {
 													aria-selected={isCurrent}
 													aria-label={`Step ${sec.id}: ${sec.title} (${isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Pending'})`}
 													title={`Go to Step ${sec.id}: ${sec.title}`}
-													className={`group relative flex-shrink-0 sm:flex-shrink min-h-[56px] h-14 px-3 sm:px-2 rounded-2xl flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer touch-manipulation select-none active:scale-95 focus-visible:ring-3 focus-visible:ring-[#3B82F6] focus-visible:outline-none ${
+													className={`group relative flex-shrink-0 sm:flex-shrink min-h-[52px] h-13 px-3 sm:px-2 rounded-xl flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer touch-manipulation select-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:outline-none ${
 														isCurrent
-															? 'bg-[#3B82F6] text-white shadow-md ring-2 ring-[#60A5FA] font-black'
+															? 'bg-[#1D4ED8] text-white shadow-sm ring-1 ring-[#1E40AF] font-bold'
 															: isCompleted
-																? 'bg-[#DCFCE7] text-[#166534] border border-[#86EFAC] hover:bg-[#BBF7D0] shadow-xs'
-																: 'bg-white text-[#475569] border border-[#E2E8F0] hover:bg-[#F8FAFC] hover:border-[#94A3B8] shadow-xs'
+																? 'bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0] hover:bg-[#DCFCE7] shadow-xs'
+																: 'bg-white text-[#64748B] border border-[#E2E8F0] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] shadow-xs'
 													}`}>
 													{/* Step Number or Check Badge */}
 													<div
-														className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 pointer-events-none transition-transform ${
+														className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 pointer-events-none transition-transform ${
 															isCurrent
-																? 'bg-[#FBBF24] text-[#0F172A] shadow-xs'
+																? 'bg-white text-[#1D4ED8] shadow-xs'
 																: isCompleted
-																	? 'bg-[#22C55E] text-white'
-																	: 'bg-[#E2E8F0] text-[#475569] group-hover:bg-[#CBD5E1]'
+																	? 'bg-[#16A34A] text-white'
+																	: 'bg-[#F1F5F9] text-[#64748B] group-hover:bg-[#E2E8F0]'
 														}`}>
 														{isCompleted ? <Check className='w-3.5 h-3.5 stroke-[2.5]' /> : sec.id}
 													</div>
@@ -1403,7 +1420,7 @@ export default function Home() {
 													<StepIcon
 														className={`w-4 h-4 hidden md:block flex-shrink-0 pointer-events-none ${
 															isCurrent
-																? 'text-[#DBEAFE]'
+																? 'text-white/80'
 																: isCompleted
 																	? 'text-[#16A34A]'
 																	: 'text-[#94A3B8]'
@@ -1411,7 +1428,7 @@ export default function Home() {
 													/>
 
 													{/* Section Title */}
-													<span className='whitespace-nowrap tracking-tight font-bold pointer-events-none'>
+													<span className='whitespace-nowrap tracking-tight font-medium pointer-events-none'>
 														<span className='sm:hidden'>{sec.shortTitle}</span>
 														<span className='hidden sm:inline lg:hidden'>{sec.shortTitle}</span>
 														<span className='hidden lg:inline'>{sec.title}</span>
@@ -1421,7 +1438,7 @@ export default function Home() {
 										})}
 									</div>
 
-									{/* Skylearn 8px Animated Progress Bar */}
+									{/* Precision Animated Progress Bar */}
 									<div
 										className='w-full skylearn-progress-track mt-3 overflow-hidden'
 										role='progressbar'
@@ -1438,7 +1455,7 @@ export default function Home() {
 									{/* Status Info Strip */}
 									<div className='flex items-center justify-between text-xs sm:text-sm text-[#475569] font-semibold mt-2 px-1 pt-1.5 border-t border-[#E2E8F0]'>
 										<span className='flex items-center gap-2 min-w-0'>
-											<Compass className='w-4 h-4 text-[#3B82F6] flex-shrink-0' />
+											<Compass className='w-4 h-4 text-[#1D4ED8] flex-shrink-0' />
 											<span className='truncate'>
 												Step {currentStep} of 5:{' '}
 												<strong className='text-[#0F172A]'>
@@ -1480,14 +1497,14 @@ export default function Home() {
 									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
 										<div className='flex items-start sm:items-center justify-between gap-4'>
 											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
-												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
-													<User className='w-6 h-6 text-white flex-shrink-0' />
+												<div className='w-11 h-11 rounded-xl bg-gradient-to-br from-[#1E3A8A] to-[#1D4ED8] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<User className='w-5 h-5 text-white flex-shrink-0' />
 												</div>
 												<div className='min-w-0 flex-1'>
 													<div className='sm:hidden mb-1.5'>
 														<span className='section-badge text-xs py-1 px-3'>Section 1 of 5</span>
 													</div>
-													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-bold text-[#0F172A] tracking-tight leading-tight sm:leading-snug font-heading'>
 														Cadet Profile & Academic Identity
 													</h2>
 													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
@@ -1809,14 +1826,14 @@ export default function Home() {
 									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
 										<div className='flex items-start sm:items-center justify-between gap-4'>
 											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
-												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
-													<GraduationCap className='w-6 h-6 text-white flex-shrink-0' />
+												<div className='w-11 h-11 rounded-xl bg-gradient-to-br from-[#1E3A8A] to-[#1D4ED8] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<GraduationCap className='w-5 h-5 text-white flex-shrink-0' />
 												</div>
 												<div className='min-w-0 flex-1'>
 													<div className='sm:hidden mb-1.5'>
 														<span className='section-badge text-xs py-1 px-3'>Section 2 of 5</span>
 													</div>
-													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-bold text-[#0F172A] tracking-tight leading-tight sm:leading-snug font-heading'>
 														Academics Profile
 													</h2>
 													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
@@ -2374,14 +2391,14 @@ export default function Home() {
 									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
 										<div className='flex items-start sm:items-center justify-between gap-4'>
 											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
-												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
-													<Award className='w-6 h-6 text-white flex-shrink-0' />
+												<div className='w-11 h-11 rounded-xl bg-gradient-to-br from-[#1E3A8A] to-[#1D4ED8] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<Award className='w-5 h-5 text-white flex-shrink-0' />
 												</div>
 												<div className='min-w-0 flex-1'>
 													<div className='sm:hidden mb-1.5'>
 														<span className='section-badge text-xs py-1 px-3'>Section 3 of 5</span>
 													</div>
-													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-bold text-[#0F172A] tracking-tight leading-tight sm:leading-snug font-heading'>
 														Co-Curricular & Leadership Profile
 													</h2>
 													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
@@ -2739,14 +2756,14 @@ export default function Home() {
 									<div className='border-b border-[#E2E8F0] pb-4 sm:pb-5'>
 										<div className='flex items-start sm:items-center justify-between gap-4'>
 											<div className='flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1'>
-												<div className='w-12 h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
-													<Lightbulb className='w-6 h-6 text-white flex-shrink-0' />
+												<div className='w-11 h-11 rounded-xl bg-gradient-to-br from-[#1E3A8A] to-[#1D4ED8] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<Lightbulb className='w-5 h-5 text-white flex-shrink-0' />
 												</div>
 												<div className='min-w-0 flex-1'>
 													<div className='sm:hidden mb-1.5'>
 														<span className='section-badge text-xs py-1 px-3'>Section 4 of 5</span>
 													</div>
-													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] uppercase tracking-wide leading-tight sm:leading-snug font-heading'>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-bold text-[#0F172A] tracking-tight leading-tight sm:leading-snug font-heading'>
 														Innovation & Problem-Solving
 													</h2>
 													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
@@ -2891,8 +2908,8 @@ export default function Home() {
 										)}
 
 										{formData.areasOfInterest.length > 0 && (
-											<p className='text-sm font-bold text-[#166534] mt-2 flex items-center gap-2 animate-fadeIn'>
-												<Sparkles className='w-4 h-4 text-[#FBBF24]' />
+											<p className='text-sm font-semibold text-[#166534] mt-2 flex items-center gap-2 animate-fadeIn'>
+												<Sparkles className='w-4 h-4 text-[#16A34A]' />
 												Selected ({formData.areasOfInterest.length}) domains
 											</p>
 										)}
@@ -2908,8 +2925,8 @@ export default function Home() {
 									<div className='border-b border-[#E2E8F0] pb-3.5 sm:pb-4'>
 										<div className='flex items-start sm:items-center justify-between gap-3'>
 											<div className='flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1'>
-												<div className='w-11 sm:w-12 h-11 sm:h-12 rounded-2xl bg-[#3B82F6] text-white flex items-center justify-center font-bold text-base shadow-sm flex-shrink-0 mt-0.5 sm:mt-0'>
-													<ShieldCheck className='w-6 h-6 text-white flex-shrink-0' />
+												<div className='w-11 h-11 rounded-xl bg-gradient-to-br from-[#1E3A8A] to-[#1D4ED8] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5 sm:mt-0'>
+													<ShieldCheck className='w-5 h-5 text-white flex-shrink-0' />
 												</div>
 												<div className='min-w-0 flex-1'>
 													<div className='sm:hidden mb-1'>
@@ -2917,7 +2934,7 @@ export default function Home() {
 															Section 5 of 5
 														</span>
 													</div>
-													<h2 className='text-base sm:text-xl lg:text-2xl font-extrabold text-[#0F172A] tracking-tight leading-snug font-heading'>
+													<h2 className='text-base sm:text-xl lg:text-2xl font-bold text-[#0F172A] tracking-tight leading-snug font-heading'>
 														Supporting Documents & Official Declaration
 													</h2>
 													<p className='text-xs sm:text-sm text-[#475569] font-medium mt-0.5 sm:mt-1 leading-relaxed'>
@@ -3165,7 +3182,7 @@ export default function Home() {
 												type='button'
 												onClick={(e) => handleSubmit(e)}
 												disabled={submitting}
-												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 bg-[#22C55E] hover:bg-[#16A34A] border-b-4 border-[#15803D] active:border-b-0 shadow-md'>
+												className='btn-primary w-full sm:w-auto flex items-center justify-center gap-2.5 !bg-[#16A34A] hover:!bg-[#15803D] !border-[#15803D] shadow-sm hover:shadow-md'>
 												<ShieldCheck className='w-5 h-5' />
 												<span>
 													{submitting ? 'Submitting Application...' : 'Submit Enrollment Form'}
@@ -3211,7 +3228,7 @@ export default function Home() {
 												type='button'
 												onClick={(e) => handleSubmit(e)}
 												disabled={submitting}
-												className='btn-primary min-h-[44px] px-4 py-2 text-xs font-bold flex items-center gap-1.5 bg-[#22C55E] hover:bg-[#16A34A] border-b-2 border-[#15803D] active:border-b-0 shadow-sm'>
+												className='btn-primary min-h-[44px] px-4 py-2 text-xs font-bold flex items-center gap-1.5 !bg-[#16A34A] hover:!bg-[#15803D] !border-[#15803D] shadow-sm'>
 												<ShieldCheck className='w-4 h-4' />
 												<span>
 													{submitting ? 'Submitting Application...' : 'Submit Enrollment Form'}

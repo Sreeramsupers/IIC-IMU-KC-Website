@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 		'IIC 2026-27',
 		'Institution Innovation Council',
 		'Cadet Registration',
-		'Skylearn Design System',
+		'Maritime Innovation',
 	],
 };
 
@@ -54,7 +54,7 @@ export default function RootLayout({
 					fetchPriority='high'
 				/>
 			</head>
-			<body className='min-h-full bg-white text-[#0F172A] flex flex-col font-sans selection:bg-[#3B82F6] selection:text-white'>
+			<body className='min-h-full bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans selection:bg-[#1D4ED8] selection:text-white'>
 				{children}
 			</body>
 		</html>

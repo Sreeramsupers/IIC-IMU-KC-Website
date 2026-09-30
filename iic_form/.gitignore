@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agents & skills (installed globally in ~/.gemini/config/skills)
+.agents/
+.agent/
+.claude/
+agent/
+skills-lock.json
