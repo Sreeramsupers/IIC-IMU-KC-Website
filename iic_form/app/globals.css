@@ -518,6 +518,38 @@ select:-webkit-autofill:focus {
 	}
 }
 
+/* Domain Interest Chips */
+.interest-tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding-block: 7px;
+	padding-inline: 13px;
+	border-radius: var(--radius-full);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	cursor: pointer;
+	min-height: 38px;
+	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+	border: 1px solid #E2E8F0 !important;
+	background-color: #F8FAFC !important;
+	color: #334155 !important;
+	user-select: none;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+	backface-visibility: hidden;
+}
+
+@media (min-width: 640px) {
+	.interest-tag-chip {
+		gap: 7px;
+		padding-block: 8px;
+		padding-inline: 15px;
+		font-size: 0.875rem;
+		min-height: 40px;
+	}
+}
+
 .interest-tag-chip:hover {
 	border-color: #93C5FD !important;
 	background-color: #EFF6FF !important;
@@ -527,9 +559,25 @@ select:-webkit-autofill:focus {
 
 .interest-tag-chip.active {
 	border-color: #1D4ED8 !important;
-	background: #1D4ED8 !important;
+	background-color: #1D4ED8 !important;
 	color: #FFFFFF !important;
-	box-shadow: 0 2px 8px rgba(29, 78, 216, 0.25) !important;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 6px rgba(29, 78, 216, 0.22) !important;
+}
+
+.interest-tag-chip.active:hover {
+	background-color: #1E40AF !important;
+	border-color: #1E40AF !important;
+	color: #FFFFFF !important;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 3px 8px rgba(29, 78, 216, 0.28) !important;
+}
+
+.interest-tag-chip:active {
+	transform: scale(0.98);
+}
+
+.interest-tag-chip:focus-visible {
+	outline: 2px solid #1D4ED8;
+	outline-offset: 2px;
 }
 
 /* Toggle Pills */
@@ -544,11 +592,20 @@ select:-webkit-autofill:focus {
 	border-radius: var(--radius-md);
 	font-size: 0.875rem;
 	font-weight: 600;
-	letter-spacing: 0.01em;
+	letter-spacing: -0.01em;
 	cursor: pointer;
-	transition: all 0.16s var(--ease-standard);
+	transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 	user-select: none;
 	text-align: center;
+}
+
+.na-toggle-btn:focus-visible {
+	outline: 2px solid #0F172A;
+	outline-offset: 2px;
+}
+
+.na-toggle-btn:active {
+	transform: scale(0.985);
 }
 
 /* Upload Dropzones */
@@ -592,20 +649,26 @@ select:-webkit-autofill:focus {
 	font-family: var(--font-heading);
 	font-weight: 600;
 	font-size: 0.875rem;
-	letter-spacing: 0.01em;
+	letter-spacing: -0.01em;
 	border-radius: var(--radius-md);
 	padding-block: 11px;
 	padding-inline: 22px;
 	min-height: 48px;
-	background: linear-gradient(180deg, #2563EB 0%, #1D4ED8 100%) !important;
-	color: #FFFFFF !important;
-	border: 1px solid #1D4ED8 !important;
-	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 3px 10px rgba(29, 78, 216, 0.22);
+	background-color: #1D4ED8;
+	color: #FFFFFF;
+	border: 1px solid #1E40AF;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(15, 23, 42, 0.08);
 	cursor: pointer;
 	touch-action: manipulation;
-	transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
+	transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, transform 0.1s ease;
 	user-select: none;
 	backface-visibility: hidden;
+	transform: translateZ(0);
+}
+
+.btn-primary > *,
+.btn-secondary > * {
+	pointer-events: none;
 }
 
 @media (min-width: 640px) {
@@ -618,13 +681,20 @@ select:-webkit-autofill:focus {
 }
 
 .btn-primary:hover:not(:disabled) {
-	background: #1E40AF !important;
-	box-shadow: 0 4px 12px rgba(29, 78, 216, 0.28);
+	background-color: #1E40AF;
+	border-color: #172554;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 3px 8px -1px rgba(15, 23, 42, 0.14);
 }
 
 .btn-primary:active:not(:disabled) {
-	transform: scale(0.99) !important;
-	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+	background-color: #172554;
+	transform: scale(0.985);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary:focus-visible {
+	outline: 2px solid #1D4ED8;
+	outline-offset: 2px;
 }
 
 .btn-primary:disabled {
@@ -632,6 +702,31 @@ select:-webkit-autofill:focus {
 	cursor: not-allowed;
 	transform: none;
 	box-shadow: none;
+}
+
+/* Dedicated Authority Navy Submit Button */
+.btn-submit {
+	background-color: #0A192F !important;
+	border-color: #030712 !important;
+	color: #FFFFFF !important;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 3px rgba(10, 25, 47, 0.18) !important;
+}
+
+.btn-submit:hover:not(:disabled) {
+	background-color: #1E293B !important;
+	border-color: #0F172A !important;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 3px 10px rgba(10, 25, 47, 0.28) !important;
+}
+
+.btn-submit:active:not(:disabled) {
+	background-color: #0F172A !important;
+	transform: scale(0.985);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.btn-submit:focus-visible {
+	outline: 2px solid #0A192F !important;
+	outline-offset: 2px;
 }
 
 /* Secondary Button */
@@ -642,7 +737,7 @@ select:-webkit-autofill:focus {
 	font-family: var(--font-heading);
 	font-weight: 600;
 	font-size: 0.875rem;
-	letter-spacing: 0.01em;
+	letter-spacing: -0.01em;
 	border-radius: var(--radius-md);
 	padding-block: 10px;
 	padding-inline: 18px;
@@ -650,10 +745,10 @@ select:-webkit-autofill:focus {
 	background-color: #FFFFFF !important;
 	color: #334155 !important;
 	border: 1px solid #CBD5E1 !important;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
 	cursor: pointer;
 	touch-action: manipulation;
-	transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
-	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+	transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease, transform 0.1s ease;
 	user-select: none;
 	backface-visibility: hidden;
 }
@@ -671,11 +766,18 @@ select:-webkit-autofill:focus {
 	background-color: #F8FAFC !important;
 	color: #0F172A !important;
 	border-color: #94A3B8 !important;
-	box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+	box-shadow: 0 2px 5px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .btn-secondary:active:not(:disabled) {
-	transform: scale(0.99) !important;
+	background-color: #F1F5F9 !important;
+	transform: scale(0.985);
+	box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.btn-secondary:focus-visible {
+	outline: 2px solid #64748B;
+	outline-offset: 2px;
 }
 
 /* ==========================================================================
@@ -715,13 +817,8 @@ button:active:not(:disabled),
 .skylearn-progress-fill {
 	height: 100%;
 	border-radius: var(--radius-full);
-	background: linear-gradient(90deg, #1D4ED8 0%, #2563EB 100%);
+	background: #1D4ED8;
 	transition: width var(--ease-progress);
-}
-
-/* Star Achievement Glow */
-.star-glow {
-	box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
 }
 
 /* ==========================================================================

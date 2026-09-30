@@ -53,7 +53,6 @@ const GOOGLE_SHEET_XLSX_URL =
 	'https://docs.google.com/spreadsheets/d/1xq90Rse_QraqiaVUpW7ettaW9kdlIqTtZF-pnnBl4pI/export?format=xlsx';
 const GOOGLE_SHEET_CSV_URL =
 	'https://docs.google.com/spreadsheets/d/1xq90Rse_QraqiaVUpW7ettaW9kdlIqTtZF-pnnBl4pI/export?format=csv';
-
 export type ReviewStatus = 'All' | 'Submitted' | 'Under Review' | 'Shortlisted' | 'Selected' | 'On Hold';
 
 export default function AdminDashboard() {
@@ -287,6 +286,21 @@ export default function AdminDashboard() {
 			}
 
 			// Proofs filter
+			if (selectedProofFilter === 'research_pr') {
+				const hasPub = (sub.journalPub && sub.journalPub !== 'NIL') || (sub.bookPub && sub.bookPub !== 'NIL');
+				const hasPatent = sub.patents && sub.patents !== 'NIL';
+				const rawStr = `${sub.rawInterests || ''} ${sub.activityDetails || ''} ${sub.leadershipDetails || ''}`.toLowerCase();
+				const hasResearch = rawStr.includes('research') || rawStr.includes('ipr') || rawStr.includes('patent');
+				const hasPR =
+					rawStr.includes('pr') ||
+					rawStr.includes('public relations') ||
+					rawStr.includes('media') ||
+					rawStr.includes('outreach') ||
+					rawStr.includes('social media');
+				if (!hasPub && !hasPatent && !hasResearch && !hasPR) {
+					return false;
+				}
+			}
 			if (selectedProofFilter === 'patents' && (!sub.patents || sub.patents === 'NIL')) {
 				return false;
 			}
@@ -354,11 +368,29 @@ export default function AdminDashboard() {
 		return Object.entries(map).sort((a, b) => b[1] - a[1]);
 	}, [submissions]);
 
-	// Quick Stats counts
+	// Overview counts: 1st Year Cadets, 2nd Year Cadets, 3rd Year Cadets, 4th Year Cadets, Research and PR
 	const stats = useMemo(() => {
 		const total = submissions.length;
 		const firstYearCount = submissions.filter((s) => s.yearOfStudy.includes('1st')).length;
-		const seniorCount = total - firstYearCount;
+		const secondYearCount = submissions.filter((s) => s.yearOfStudy.includes('2nd')).length;
+		const thirdYearCount = submissions.filter((s) => s.yearOfStudy.includes('3rd')).length;
+		const fourthYearCount = submissions.filter((s) => s.yearOfStudy.includes('4th')).length;
+
+		// Cadets with Research (publications, patents) or PR / Media / Outreach
+		const researchAndPrCount = submissions.filter((s) => {
+			const hasPub = (s.journalPub && s.journalPub !== 'NIL') || (s.bookPub && s.bookPub !== 'NIL');
+			const hasPatent = s.patents && s.patents !== 'NIL';
+			const rawStr = `${s.rawInterests || ''} ${s.activityDetails || ''} ${s.leadershipDetails || ''}`.toLowerCase();
+			const hasResearch = rawStr.includes('research') || rawStr.includes('ipr') || rawStr.includes('patent');
+			const hasPR =
+				rawStr.includes('pr') ||
+				rawStr.includes('public relations') ||
+				rawStr.includes('media') ||
+				rawStr.includes('outreach') ||
+				rawStr.includes('social media');
+			return hasPub || hasPatent || hasResearch || hasPR;
+		}).length;
+
 		const withPatents = submissions.filter((s) => s.patents && s.patents !== 'NIL').length;
 		const withPubs = submissions.filter((s) => s.journalPub && s.journalPub !== 'NIL').length;
 		const withCompetitions = submissions.filter((s) => s.competitions && s.competitions !== 'NIL').length;
@@ -367,7 +399,10 @@ export default function AdminDashboard() {
 		return {
 			total,
 			firstYearCount,
-			seniorCount,
+			secondYearCount,
+			thirdYearCount,
+			fourthYearCount,
+			researchAndPrCount,
 			withPatents,
 			withPubs,
 			withCompetitions,
@@ -479,7 +514,7 @@ export default function AdminDashboard() {
 						<button
 							type='submit'
 							disabled={isAuthenticating}
-							className='w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer'>
+							className='w-full py-2.5 px-4 bg-[#0A192F] hover:bg-[#1E293B] active:scale-[0.985] disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-xs'>
 							{isAuthenticating ? (
 								<>
 									<RefreshCw className='w-4 h-4 animate-spin text-slate-300' />
@@ -627,69 +662,138 @@ export default function AdminDashboard() {
 
 			{/* Main Container */}
 			<main className='flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6'>
-				{/* Clean Unified Metrics Strip */}
-				<div className='bg-white rounded-xl border border-slate-200/80 shadow-xs grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-slate-100 overflow-hidden'>
-					{/* Stat 1: Total Applications */}
-					<div className='p-4'>
-						<span className='text-xs text-slate-500 font-medium block'>Applications</span>
-						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading'>
+				{/* Overview Headings Strip: Total Registrations, 1st Year Cadets, 2nd Year Cadets, 3rd Year Cadets, 4th Year Cadets, Research and PR */}
+				<div className='bg-slate-200/70 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px overflow-hidden'>
+					{/* Card 1: Total Registrations */}
+					<button
+						type='button'
+						onClick={() => {
+							setSelectedYear('All');
+							setSelectedProofFilter('All');
+						}}
+						className={`p-4 text-left transition-all duration-150 cursor-pointer group active:scale-[0.99] ${
+							selectedYear === 'All' && selectedProofFilter === 'All'
+								? 'bg-blue-50/75 shadow-[inset_0_-2.5px_0_#1D4ED8]'
+								: 'bg-white hover:bg-slate-50/80'
+						}`}>
+						<span className='text-xs text-slate-500 font-semibold block uppercase tracking-wider group-hover:text-blue-600 transition-colors'>
+							Total Registrations
+						</span>
+						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading tabular-nums'>
 							{stats.total}
 						</div>
-						<span className='text-[11px] text-slate-400 block mt-0.5'>Total received</span>
-					</div>
+						<span className='text-[11px] text-slate-400 block mt-0.5'>
+							All Cadets
+							{selectedYear === 'All' && selectedProofFilter === 'All' && (
+								<span className='text-blue-600 font-semibold ml-1'>• View all</span>
+							)}
+						</span>
+					</button>
 
-					{/* Stat 2: 1st Year */}
-					<div className='p-4'>
-						<span className='text-xs text-slate-500 font-medium block'>1st Year</span>
-						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading'>
+					{/* Card 2: 1st Year Cadets */}
+					<button
+						type='button'
+						onClick={() => setSelectedYear(selectedYear === '1st Year' ? 'All' : '1st Year')}
+						className={`p-4 text-left transition-all duration-150 cursor-pointer group active:scale-[0.99] ${
+							selectedYear === '1st Year'
+								? 'bg-blue-50/75 shadow-[inset_0_-2.5px_0_#1D4ED8]'
+								: 'bg-white hover:bg-slate-50/80'
+						}`}>
+						<span className='text-xs text-slate-500 font-semibold block uppercase tracking-wider group-hover:text-blue-600 transition-colors'>
+							1st Year Cadets
+						</span>
+						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading tabular-nums'>
 							{stats.firstYearCount}
 						</div>
 						<span className='text-[11px] text-slate-400 block mt-0.5'>
 							{stats.total > 0 ? `${Math.round((stats.firstYearCount / stats.total) * 100)}% of total` : '0%'}
+							{selectedYear === '1st Year' && <span className='text-blue-600 font-semibold ml-1'>• Filter active</span>}
 						</span>
-					</div>
+					</button>
 
-					{/* Stat 3: Senior Cadets */}
-					<div className='p-4'>
-						<span className='text-xs text-slate-500 font-medium block'>2nd–4th Year</span>
-						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading'>
-							{stats.seniorCount}
+					{/* Card 3: 2nd Year Cadets */}
+					<button
+						type='button'
+						onClick={() => setSelectedYear(selectedYear === '2nd Year' ? 'All' : '2nd Year')}
+						className={`p-4 text-left transition-all duration-150 cursor-pointer group active:scale-[0.99] ${
+							selectedYear === '2nd Year'
+								? 'bg-blue-50/75 shadow-[inset_0_-2.5px_0_#1D4ED8]'
+								: 'bg-white hover:bg-slate-50/80'
+						}`}>
+						<span className='text-xs text-slate-500 font-semibold block uppercase tracking-wider group-hover:text-blue-600 transition-colors'>
+							2nd Year Cadets
+						</span>
+						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading tabular-nums'>
+							{stats.secondYearCount}
 						</div>
 						<span className='text-[11px] text-slate-400 block mt-0.5'>
-							{stats.total > 0 ? `${Math.round((stats.seniorCount / stats.total) * 100)}% of total` : '0%'}
+							{stats.total > 0 ? `${Math.round((stats.secondYearCount / stats.total) * 100)}% of total` : '0%'}
+							{selectedYear === '2nd Year' && <span className='text-blue-600 font-semibold ml-1'>• Filter active</span>}
 						</span>
-					</div>
+					</button>
 
-					{/* Stat 4: Research & Patents */}
-					<div className='p-4'>
-						<span className='text-xs text-slate-500 font-medium block'>Research & IPR</span>
-						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading'>
-							{stats.withPubs + stats.withPatents}
-						</div>
-						<span className='text-[11px] text-slate-400 block mt-0.5 truncate' title={`${stats.withPatents} patents, ${stats.withPubs} publications`}>
-							{stats.withPatents} patents, {stats.withPubs} pubs
+					{/* Card 4: 3rd Year Cadets */}
+					<button
+						type='button'
+						onClick={() => setSelectedYear(selectedYear === '3rd Year' ? 'All' : '3rd Year')}
+						className={`p-4 text-left transition-all duration-150 cursor-pointer group active:scale-[0.99] ${
+							selectedYear === '3rd Year'
+								? 'bg-blue-50/75 shadow-[inset_0_-2.5px_0_#1D4ED8]'
+								: 'bg-white hover:bg-slate-50/80'
+						}`}>
+						<span className='text-xs text-slate-500 font-semibold block uppercase tracking-wider group-hover:text-blue-600 transition-colors'>
+							3rd Year Cadets
 						</span>
-					</div>
-
-					{/* Stat 5: Hackathons */}
-					<div className='p-4'>
-						<span className='text-xs text-slate-500 font-medium block'>Competitions</span>
-						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading'>
-							{stats.withCompetitions}
+						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading tabular-nums'>
+							{stats.thirdYearCount}
 						</div>
-						<span className='text-[11px] text-slate-400 block mt-0.5'>Contests & events</span>
-					</div>
-
-					{/* Stat 6: Drive Folders */}
-					<div className='p-4'>
-						<span className='text-xs text-slate-500 font-medium block'>Drive Folders</span>
-						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading'>
-							{stats.withDrive}
-						</div>
-						<span className='text-[11px] text-emerald-600 font-medium block mt-0.5'>
-							Linked to Drive
+						<span className='text-[11px] text-slate-400 block mt-0.5'>
+							{stats.total > 0 ? `${Math.round((stats.thirdYearCount / stats.total) * 100)}% of total` : '0%'}
+							{selectedYear === '3rd Year' && <span className='text-blue-600 font-semibold ml-1'>• Filter active</span>}
 						</span>
-					</div>
+					</button>
+
+					{/* Card 5: 4th Year Cadets */}
+					<button
+						type='button'
+						onClick={() => setSelectedYear(selectedYear === '4th Year' ? 'All' : '4th Year')}
+						className={`p-4 text-left transition-all duration-150 cursor-pointer group active:scale-[0.99] ${
+							selectedYear === '4th Year'
+								? 'bg-blue-50/75 shadow-[inset_0_-2.5px_0_#1D4ED8]'
+								: 'bg-white hover:bg-slate-50/80'
+						}`}>
+						<span className='text-xs text-slate-500 font-semibold block uppercase tracking-wider group-hover:text-blue-600 transition-colors'>
+							4th Year Cadets
+						</span>
+						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading tabular-nums'>
+							{stats.fourthYearCount}
+						</div>
+						<span className='text-[11px] text-slate-400 block mt-0.5'>
+							{stats.total > 0 ? `${Math.round((stats.fourthYearCount / stats.total) * 100)}% of total` : '0%'}
+							{selectedYear === '4th Year' && <span className='text-blue-600 font-semibold ml-1'>• Filter active</span>}
+						</span>
+					</button>
+
+					{/* Card 6: Research and PR */}
+					<button
+						type='button'
+						onClick={() => setSelectedProofFilter(selectedProofFilter === 'research_pr' ? 'All' : 'research_pr')}
+						className={`p-4 text-left transition-all duration-150 cursor-pointer group active:scale-[0.99] ${
+							selectedProofFilter === 'research_pr'
+								? 'bg-blue-50/75 shadow-[inset_0_-2.5px_0_#1D4ED8]'
+								: 'bg-white hover:bg-slate-50/80'
+						}`}>
+						<span className='text-xs text-slate-500 font-semibold block uppercase tracking-wider group-hover:text-blue-600 transition-colors'>
+							Research and PR
+						</span>
+						<div className='text-2xl font-bold text-slate-900 mt-1 font-heading tabular-nums'>
+							{stats.researchAndPrCount}
+						</div>
+						<span className='text-[11px] text-slate-400 block mt-0.5'>
+							Publications, IPR & PR
+							{selectedProofFilter === 'research_pr' && <span className='text-blue-600 font-semibold ml-1'>• Filter active</span>}
+						</span>
+					</button>
 				</div>
 
 				{/* Error Notice if fetch failed */}
@@ -829,6 +933,7 @@ export default function AdminDashboard() {
 									onChange={(e) => setSelectedProofFilter(e.target.value)}
 									className='px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium focus:border-blue-500 outline-none'>
 									<option value='All'>All Qualifications</option>
+									<option value='research_pr'>Research & PR</option>
 									<option value='patents'>Patents / IPR</option>
 									<option value='publications'>Publications</option>
 									<option value='competitions'>Hackathons & Contests</option>
@@ -918,8 +1023,7 @@ export default function AdminDashboard() {
 												<th className='py-3 px-4'>Year & Department</th>
 												<th className='py-3 px-4'>CGPA</th>
 												<th className='py-3 px-4'>Contact</th>
-												<th className='py-3 px-4 text-center'>Documents</th>
-												<th className='py-3 px-4'>Status</th>
+												<th className='py-3 px-4'>Review Status</th>
 												<th className='py-3 px-4 text-right'>Action</th>
 											</tr>
 										</thead>
@@ -1010,34 +1114,6 @@ export default function AdminDashboard() {
 															</div>
 														</td>
 
-														{/* Documents & Form */}
-														<td className='py-3 px-4 text-center'>
-															<div className='flex flex-col items-center gap-1.5'>
-																{sub.driveFolderUrl && sub.driveFolderUrl.startsWith('http') ? (
-																	<a
-																		href={sub.driveFolderUrl}
-																		target='_blank'
-																		rel='noopener noreferrer'
-																		title='Open applicant Google Drive folder'
-																		className='w-full inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs border border-slate-200 shadow-xs transition-colors'>
-																		<Folder className='w-3 h-3 text-emerald-600' />
-																		<span>Drive Folder</span>
-																		<ExternalLink className='w-2.5 h-2.5 opacity-50' />
-																	</a>
-																) : (
-																	<span className='text-[11px] text-slate-400 italic'>
-																		No Drive folder
-																	</span>
-																)}
-
-																<button
-																	onClick={() => setSelectedCadet(sub)}
-																	className='w-full inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs border border-slate-200 transition-colors cursor-pointer'>
-																	<FileText className='w-3 h-3 text-slate-500' />
-																	<span>View Form</span>
-																</button>
-															</div>
-														</td>
 
 														{/* Status */}
 														<td className='py-3 px-4'>
@@ -1068,14 +1144,27 @@ export default function AdminDashboard() {
 															</div>
 														</td>
 
-														{/* Action Button */}
+														{/* Action Button: View Form + Drive */}
 														<td className='py-3 px-4 text-right'>
-															<button
-																onClick={() => setSelectedCadet(sub)}
-																className='p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer'
-																title='View Application'>
-																<ChevronRight className='w-4 h-4' />
-															</button>
+															<div className='inline-flex items-center gap-1.5 justify-end'>
+																<button
+																	type='button'
+																	onClick={() => setSelectedCadet(sub)}
+																	className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0A192F] hover:bg-[#1E293B] active:scale-[0.98] text-white font-medium text-xs transition-all duration-150 cursor-pointer shadow-xs'>
+																	<FileText className='w-3.5 h-3.5' />
+																	<span>View Form</span>
+																</button>
+																{sub.driveFolderUrl && sub.driveFolderUrl.startsWith('http') && (
+																	<a
+																		href={sub.driveFolderUrl}
+																		target='_blank'
+																		rel='noopener noreferrer'
+																		title='Open Cadet Google Drive folder'
+																		className='p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200 transition-colors'>
+																		<Folder className='w-3.5 h-3.5' />
+																	</a>
+																)}
+															</div>
 														</td>
 													</tr>
 												);
@@ -1187,23 +1276,24 @@ export default function AdminDashboard() {
 											</div>
 
 											{/* Action Buttons for Card */}
-											<div className='space-y-2 pt-3 border-t border-slate-100'>
+											<div className='flex items-center gap-2 pt-3 border-t border-slate-100'>
+												<button
+													type='button'
+													onClick={() => setSelectedCadet(sub)}
+													className='flex-1 py-1.5 px-3 rounded-lg bg-[#0A192F] hover:bg-[#1E293B] active:scale-[0.98] text-white font-medium text-xs flex items-center justify-center gap-1.5 transition-all duration-150 cursor-pointer shadow-xs'>
+													<FileText className='w-3.5 h-3.5' />
+													<span>View Form</span>
+												</button>
 												{sub.driveFolderUrl && sub.driveFolderUrl.startsWith('http') && (
 													<a
 														href={sub.driveFolderUrl}
 														target='_blank'
 														rel='noopener noreferrer'
-														className='w-full py-1.5 px-3 rounded-lg bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs border border-slate-200 shadow-xs flex items-center justify-center gap-1.5 transition-colors'>
-														<Folder className='w-3.5 h-3.5 text-emerald-600' />
-														<span>Open Drive Folder ↗</span>
+														title='Open Cadet Drive Folder'
+														className='p-1.5 rounded-lg bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 transition-colors'>
+														<Folder className='w-4 h-4' />
 													</a>
 												)}
-												<button
-													onClick={() => setSelectedCadet(sub)}
-													className='w-full py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer'>
-													<FileText className='w-3.5 h-3.5' />
-													<span>View Application Details</span>
-												</button>
 											</div>
 										</div>
 									);
@@ -1319,7 +1409,7 @@ export default function AdminDashboard() {
 
 											<button
 												onClick={() => setSelectedCadet(sub)}
-												className='px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition-colors cursor-pointer'>
+												className='px-3 py-1.5 rounded-lg bg-[#0A192F] hover:bg-[#1E293B] active:scale-[0.98] text-white font-medium text-xs transition-all duration-150 cursor-pointer shadow-xs'>
 												View Form
 											</button>
 										</div>
@@ -1342,11 +1432,11 @@ export default function AdminDashboard() {
 			{/* APPLICATION FORM MODAL (INSTITUTIONAL LAYOUT)                             */}
 			{/* ======================================================================== */}
 			{selectedCadet && (
-				<div className='fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn'>
-					<div className='bg-white w-full max-w-4xl rounded-2xl shadow-xl border border-slate-300 overflow-hidden my-auto max-h-[92vh] flex flex-col'>
+				<div className='fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn'>
+					<div className='bg-white w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-300 overflow-hidden my-auto max-h-[94vh] flex flex-col'>
 						{/* Modal Header Bar */}
-						<div className='bg-[#0A192F] text-white px-5 py-3.5 border-b border-slate-700 flex items-center justify-between flex-shrink-0'>
-							<div className='flex items-center gap-3'>
+						<div className='bg-[#0A192F] text-white px-5 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 flex-shrink-0'>
+							<div className='flex items-center gap-3 min-w-0'>
 								<div className='w-8 h-8 rounded-lg bg-white/10 p-1 flex items-center justify-center flex-shrink-0'>
 									<Image
 										src='/imu-logo.png'
@@ -1356,33 +1446,40 @@ export default function AdminDashboard() {
 										className='object-contain'
 									/>
 								</div>
-								<div>
-									<h3 className='font-semibold text-sm sm:text-base text-white'>
-										Student Application Form
-									</h3>
-									<p className='text-xs text-slate-400'>
-										Institution’s Innovation Council • IMU Kolkata Campus
+								<div className='min-w-0'>
+									<div className='flex items-center gap-2 flex-wrap'>
+										<h3 className='font-bold text-sm sm:text-base text-white truncate'>
+											{selectedCadet.cadetName}
+										</h3>
+										<span className='font-mono text-xs px-2 py-0.5 rounded bg-blue-900/80 text-blue-200 border border-blue-700'>
+											{selectedCadet.referenceId}
+										</span>
+									</div>
+									<p className='text-xs text-slate-400 truncate'>
+										{selectedCadet.yearOfStudy} • {selectedCadet.department} • Roll: {selectedCadet.regNumber || 'N/A'}
 									</p>
 								</div>
 							</div>
 
+							{/* Actions */}
 							<div className='flex items-center gap-2'>
 								<button
 									onClick={handlePrint}
 									className='px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700'
 									title='Print Application Form'>
-									<Printer className='w-3.5 h-3.5' />
-									<span className='hidden sm:inline'>Print Form</span>
+									<Printer className='w-3.5 h-3.5 text-blue-400' />
+									<span>Print Form</span>
 								</button>
 								<button
 									onClick={() => setSelectedCadet(null)}
-									className='p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer'>
+									className='p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer'
+									title='Close'>
 									<X className='w-5 h-5' />
 								</button>
 							</div>
 						</div>
 
-						{/* Modal Printable Body */}
+						{/* Printable Default Application Dossier */}
 						<div id='printable-application-form' className='p-6 overflow-y-auto space-y-6 flex-1 text-slate-800'>
 							{/* Official Institutional Letterhead */}
 							<div className='border-b border-slate-200 pb-4 text-center space-y-1'>
@@ -1720,9 +1817,27 @@ export default function AdminDashboard() {
 						</div>
 
 						{/* Modal Footer Controls */}
-						<div className='bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0'>
-							<div className='text-xs text-slate-500 font-mono'>
-								Reference ID: {selectedCadet.referenceId}
+						<div className='bg-slate-50 px-6 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0'>
+							<div className='flex items-center gap-3 text-xs'>
+								<span className='text-slate-500 font-mono'>
+									ID: {selectedCadet.referenceId}
+								</span>
+								<span className='text-slate-300'>•</span>
+								<div className='flex items-center gap-1.5'>
+									<span className='text-slate-600 font-medium'>Status:</span>
+									<select
+										value={reviewStatuses[selectedCadet.referenceId] || 'Submitted'}
+										onChange={(e) =>
+											updateCadetStatus(selectedCadet.referenceId, e.target.value as ReviewStatus)
+										}
+										className='px-2 py-1 rounded border border-slate-300 bg-white font-medium text-xs text-slate-800 outline-none'>
+										<option value='Submitted'>Submitted</option>
+										<option value='Under Review'>Under Review</option>
+										<option value='Shortlisted'>Shortlisted</option>
+										<option value='Selected'>Selected</option>
+										<option value='On Hold'>On Hold</option>
+									</select>
+								</div>
 							</div>
 							<div className='flex items-center gap-2 w-full sm:w-auto'>
 								{selectedCadet.driveFolderUrl && selectedCadet.driveFolderUrl.startsWith('http') && (

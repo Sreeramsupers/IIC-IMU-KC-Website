@@ -39,6 +39,18 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
+		// Validation: Marksheet PDF is mandatory for 2nd, 3rd, and 4th year cadets
+		const isFirstYear = data.yearOfStudy === '1st Year' || data.semester === 'Semester 1';
+		if (!isFirstYear && !data.marksheetDataUrl && !data.marksheetName) {
+			return NextResponse.json(
+				{
+					success: false,
+					error: 'Semester Marksheet PDF is mandatory for 2nd, 3rd, and 4th Year cadets.',
+				},
+				{ status: 400 },
+			);
+		}
+
 		const referenceId = data.referenceId || `IIC-2627-${Math.floor(1000 + Math.random() * 9000)}`;
 
 		const rawUrl =
