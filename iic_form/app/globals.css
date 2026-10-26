@@ -136,7 +136,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 	font-family: var(--font-heading);
 	letter-spacing: -0.015em;
 	text-wrap: balance;
-	color: #0F172A;
+	color: inherit;
 }
 
 p, li, label, span {
@@ -892,24 +892,237 @@ button:active:not(:disabled),
    5. PRINT & ACCESSIBILITY OPTIMIZATIONS
    ========================================================================== */
 
+@page {
+	margin: 10mm 10mm;
+	size: auto;
+}
+
 @media print {
+	*, *::before, *::after {
+		-webkit-print-color-adjust: exact !important;
+		print-color-adjust: exact !important;
+	}
+
 	body {
 		background: #FFFFFF !important;
 		color: #000000 !important;
+		font-size: 11pt;
 	}
 
 	.clean-card {
 		box-shadow: none !important;
-		border: 1px solid #000000 !important;
-		border-radius: 0 !important;
+		border: 1px solid #cbd5e1 !important;
+		border-radius: 6px !important;
 	}
 
-	.btn-primary, .btn-secondary, button {
+	/* Hide non-printable interactive controls & web app header */
+	header,
+	.no-print,
+	.btn-primary,
+	.btn-secondary {
 		display: none !important;
 	}
 
-	.no-print {
+	/* Hide interactive action buttons in table and cards during general print */
+	.admin-action-btn,
+	.admin-nav-tabs,
+	.admin-search-toolbar,
+	.admin-toast-portal {
 		display: none !important;
+	}
+
+	/* Reset main container padding and width for print */
+	main {
+		width: 100% !important;
+		max-width: 100% !important;
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+
+	.overflow-x-auto {
+		overflow: visible !important;
+		width: 100% !important;
+		max-width: 100% !important;
+	}
+
+	/* Retain Top Overview Statistics Strip on Admin Dashboard */
+	.admin-overview-stats {
+		display: grid !important;
+		grid-template-columns: repeat(6, 1fr) !important;
+		gap: 6px !important;
+		margin-bottom: 16px !important;
+		background: #f8fafc !important;
+		border: 1px solid #94a3b8 !important;
+		page-break-inside: avoid !important;
+		break-inside: avoid !important;
+	}
+
+	.admin-overview-stats button,
+	.admin-overview-stats .admin-stat-card {
+		display: block !important;
+		visibility: visible !important;
+		background: #ffffff !important;
+		border: 1px solid #cbd5e1 !important;
+		border-radius: 6px !important;
+		padding: 8px 8px !important;
+		box-shadow: none !important;
+		color: #0f172a !important;
+		text-align: left !important;
+		cursor: default !important;
+	}
+
+	.admin-overview-stats button span:first-child,
+	.admin-overview-stats .admin-stat-card span:first-child {
+		color: #1e293b !important;
+		font-weight: 700 !important;
+		font-size: 7.5pt !important;
+		display: block !important;
+		text-transform: uppercase !important;
+		letter-spacing: 0.05em !important;
+	}
+
+	.admin-overview-stats button div,
+	.admin-overview-stats .admin-stat-card div {
+		color: #0f172a !important;
+		font-size: 15pt !important;
+		font-weight: 800 !important;
+		margin-top: 2px !important;
+	}
+
+	.admin-overview-stats button span:last-child,
+	.admin-overview-stats .admin-stat-card span:last-child {
+		font-size: 7pt !important;
+		color: #64748b !important;
+		display: block !important;
+	}
+
+	.admin-overview-stats button *,
+	.admin-overview-stats .admin-stat-card * {
+		visibility: visible !important;
+	}
+
+	/* Cadet Photos in print */
+	img.cadet-photo,
+	.cadet-photo-container,
+	.cadet-photo-container img,
+	.cadet-avatar-img {
+		display: block !important;
+		visibility: visible !important;
+		-webkit-print-color-adjust: exact !important;
+		print-color-adjust: exact !important;
+	}
+
+	/* Clean styling for table in print */
+	.admin-submissions-table {
+		width: 100% !important;
+		min-width: 0 !important;
+		max-width: 100% !important;
+		table-layout: fixed !important;
+		border-collapse: collapse !important;
+		page-break-inside: auto !important;
+	}
+
+	.admin-submissions-table tr {
+		page-break-inside: avoid !important;
+		break-inside: avoid !important;
+	}
+
+	.admin-submissions-table th,
+	.admin-submissions-table td {
+		border: 1px solid #cbd5e1 !important;
+		padding: 5px 6px !important;
+		min-width: 0 !important;
+		vertical-align: middle !important;
+	}
+
+	.admin-submissions-table th {
+		background: #f1f5f9 !important;
+		color: #0f172a !important;
+		font-weight: 700 !important;
+		font-size: 8pt !important;
+		text-transform: uppercase !important;
+		letter-spacing: 0.04em !important;
+	}
+
+	/* 5-Column strict print distribution fitting exactly 100% of the printable page width */
+	.admin-submissions-table th:nth-child(1),
+	.admin-submissions-table td:nth-child(1) {
+		width: 27% !important; /* Applicant */
+	}
+
+	.admin-submissions-table th:nth-child(2),
+	.admin-submissions-table td:nth-child(2) {
+		width: 21% !important; /* Year & Department */
+	}
+
+	.admin-submissions-table th:nth-child(3),
+	.admin-submissions-table td:nth-child(3) {
+		width: 9% !important; /* CGPA */
+		text-align: center !important;
+	}
+
+	.admin-submissions-table th:nth-child(4),
+	.admin-submissions-table td:nth-child(4) {
+		width: 28% !important; /* Contact */
+	}
+
+	.admin-submissions-table th:nth-child(5),
+	.admin-submissions-table td:nth-child(5) {
+		width: 15% !important; /* Review Status */
+		text-align: center !important;
+	}
+
+	.admin-submissions-table th:nth-child(6),
+	.admin-submissions-table td:nth-child(6) {
+		display: none !important; /* Action button */
+	}
+
+	/* Guarantee student emails and contact links NEVER get truncated or cut off in print */
+	a[href^="mailto:"],
+	.cadet-email,
+	td a {
+		white-space: normal !important;
+		word-break: break-all !important;
+		overflow: visible !important;
+		text-overflow: clip !important;
+		display: block !important;
+		max-width: 100% !important;
+		color: #0f172a !important;
+		text-decoration: none !important;
+		font-size: 8pt !important;
+		line-height: 1.25 !important;
+	}
+
+	/* When dossier modal is open during print, isolate and print only the dossier */
+	body.modal-open header,
+	body.modal-open main,
+	body.modal-open footer,
+	body.modal-open .admin-dashboard-container {
+		display: none !important;
+	}
+
+	body.modal-open .modal-backdrop {
+		position: static !important;
+		overflow: visible !important;
+		max-height: none !important;
+		background: transparent !important;
+		padding: 0 !important;
+		margin: 0 !important;
+		border: none !important;
+		box-shadow: none !important;
+	}
+
+	body.modal-open .modal-container {
+		position: static !important;
+		overflow: visible !important;
+		max-height: none !important;
+		height: auto !important;
+		width: 100% !important;
+		max-width: 100% !important;
+		border: none !important;
+		box-shadow: none !important;
+		margin: 0 !important;
+		padding: 0 !important;
 	}
 
 	#printable-application-form,
@@ -925,6 +1138,27 @@ button:active:not(:disabled),
 		padding: 0 !important;
 		background: #ffffff !important;
 		color: #000000 !important;
+		overflow: visible !important;
+	}
+
+	/* Ensure all dossier and report headings are bold and pitch black in print */
+	#printable-application-form h1,
+	#printable-application-form h2,
+	#printable-application-form h3,
+	#printable-application-form h4,
+	#printable-application-form h5,
+	#printable-application-form h6,
+	.print-report-header h1,
+	main h1 {
+		color: #000000 !important;
+		font-weight: 700 !important;
+		page-break-after: avoid !important;
+		break-after: avoid !important;
+	}
+
+	.page-break-inside-avoid {
+		page-break-inside: avoid !important;
+		break-inside: avoid !important;
 	}
 }
 

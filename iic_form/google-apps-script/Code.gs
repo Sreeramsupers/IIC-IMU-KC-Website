@@ -374,8 +374,9 @@ function doPost(e) {
 		}
 
 		// 1. Passport Photo (Saved to Drive, not attached to email as photo is in the doc)
+		let savedPassportPhoto = null;
 		if (data.photoDataUrl) {
-			saveAndCollectCadetFile(
+			savedPassportPhoto = saveAndCollectCadetFile(
 				cadetFolder,
 				data.photoDataUrl,
 				`Passport_Photo_${cleanCadetName}.jpg`,
@@ -524,6 +525,7 @@ function doPost(e) {
 							: 'Not Applicable',
 					appPdfUrl: savedAppPdf ? savedAppPdf.getUrl() : '',
 					driveFolderUrl: cadetFolder ? cadetFolder.getUrl() : '',
+					photoUrl: savedPassportPhoto ? savedPassportPhoto.getUrl() : '',
 					journal: data.hasJournalPub
 						? data.journalDetails
 							? data.journalDetails
@@ -941,10 +943,24 @@ function doPost(e) {
 
 /**
  * Gets or creates the Root folder in Google Drive (e.g. "2026-27")
- * Folders are kept 100% private in the script owner's Google Drive.
+ * Caches folder ID in ScriptProperties for high-speed lookups without repeated Drive queries.
  */
 function getOrCreateRootFolder(folderName) {
 	const safeName = (folderName || '2026-27').trim();
+	const cacheKey = 'CACHE_ROOT_DIR_' + safeName.replace(/[^a-zA-Z0-9]/g, '_');
+	try {
+		const props = PropertiesService.getScriptProperties();
+		const cachedId = props.getProperty(cacheKey);
+		if (cachedId) {
+			try {
+				const cachedFolder = DriveApp.getFolderById(cachedId);
+				if (cachedFolder && !cachedFolder.isTrashed()) {
+					return cachedFolder;
+				}
+			} catch (_) {}
+		}
+	} catch (_) {}
+
 	const folders = DriveApp.getFoldersByName(safeName);
 	let folder;
 	if (folders.hasNext()) {
@@ -953,21 +969,50 @@ function getOrCreateRootFolder(folderName) {
 		folder = DriveApp.createFolder(safeName);
 	}
 
-	// Folders are kept 100% private in the script owner's Google Drive without any sharing
+	try {
+		PropertiesService.getScriptProperties().setProperty(cacheKey, folder.getId());
+	} catch (_) {}
+
 	return folder;
 }
 
 /**
  * Gets or creates a child folder inside a parent folder (private, no public link sharing)
+ * Caches common structural subfolders (e.g. Year folders) to speed up execution.
  */
 function getOrCreateSubFolder(parentFolder, childFolderName) {
 	const safeName = (childFolderName || 'General').trim();
+	const isYearFolder = safeName.includes('Year');
+	const cacheKey = isYearFolder
+		? 'CACHE_YEAR_DIR_' + parentFolder.getId() + '_' + safeName.replace(/[^a-zA-Z0-9]/g, '_')
+		: null;
+
+	if (cacheKey) {
+		try {
+			const cachedId = PropertiesService.getScriptProperties().getProperty(cacheKey);
+			if (cachedId) {
+				try {
+					const cachedFolder = DriveApp.getFolderById(cachedId);
+					if (cachedFolder && !cachedFolder.isTrashed()) {
+						return cachedFolder;
+					}
+				} catch (_) {}
+			}
+		} catch (_) {}
+	}
+
 	const folders = parentFolder.getFoldersByName(safeName);
 	let folder;
 	if (folders.hasNext()) {
 		folder = folders.next();
 	} else {
 		folder = parentFolder.createFolder(safeName);
+	}
+
+	if (cacheKey) {
+		try {
+			PropertiesService.getScriptProperties().setProperty(cacheKey, folder.getId());
+		} catch (_) {}
 	}
 
 	return folder;
@@ -1144,6 +1189,7 @@ function appendCadetRowToSheet(sheet, record) {
 		interests: record.interests || 'NIL',
 		problemMaritime: record.problemMaritime || 'NIL',
 		problemSociety: record.problemSociety || 'NIL',
+		photoUrl: record.photoUrl || '',
 		status: 'Submitted',
 	};
 
@@ -1210,6 +1256,9 @@ function appendCadetRowToSheet(sheet, record) {
 		) {
 			// Map any old consolidated proof column to drive folder URL
 			rowValues.push(map.driveFolder || map.appPdf);
+			matchedCount++;
+		} else if (h.includes('photo') || h.includes('picture') || h.includes('avatar')) {
+			rowValues.push(map.photoUrl);
 			matchedCount++;
 		} else if (h.includes('drive') || h.includes('folder')) {
 			rowValues.push(map.driveFolder);
