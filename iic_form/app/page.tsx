@@ -229,7 +229,7 @@ export default function Home() {
 	const [noticeExpanded, setNoticeExpanded] = useState(false);
 	const stepButtonsRef = useRef<{ [key: number]: HTMLButtonElement | null }>({});
 	const stepperContainerRef = useRef<HTMLDivElement | null>(null);
-	const stepEnteredAtRef = useRef<number>(Date.now());
+	const stepEnteredAtRef = useRef<number>(0);
 
 	useEffect(() => {
 		stepEnteredAtRef.current = Date.now();

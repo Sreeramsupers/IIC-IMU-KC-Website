@@ -374,9 +374,18 @@ export function NativeSpreadsheet({
 										return (
 											<tr
 												key={rowIdx}
+												onDoubleClick={() => matchedCadet && onViewCadetForm(matchedCadet)}
 												className='hover:bg-blue-50/40 transition-colors group'>
 												{/* Row Number Column (Sticky Left) */}
-												<td className='w-12 min-w-12 px-2 py-2 text-center border-r border-slate-300 bg-slate-100 font-bold text-slate-500 sticky left-0 z-10 select-none group-hover:bg-blue-100 group-hover:text-blue-900 transition-colors text-[11px]'>
+												<td
+													onClick={(e) => {
+														if (matchedCadet) {
+															e.stopPropagation();
+															onViewCadetForm(matchedCadet);
+														}
+													}}
+													title={matchedCadet ? 'Click to view full application details' : undefined}
+													className='w-12 min-w-12 px-2 py-2 text-center border-r border-slate-300 bg-slate-100 font-bold text-slate-500 sticky left-0 z-10 select-none group-hover:bg-blue-100 group-hover:text-blue-900 transition-colors text-[11px] cursor-pointer'>
 													{rowIdx + 2}
 												</td>
 

@@ -9,7 +9,7 @@
  * request limit, unlocking the instant (<200ms) background-processing submission route.
  */
 
-import { PDFDocument, PDFName, PDFNumber } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFNumber, PDFDict } from 'pdf-lib';
 
 export interface OptimizePdfResult {
 	dataUrl: string;
@@ -192,7 +192,10 @@ export async function optimizePdf(
 		// Iterate through all indirect objects in the PDF to find oversized image streams
 		for (const [, obj] of doc.context.enumerateIndirectObjects()) {
 			if (obj && typeof obj === 'object' && 'dict' in obj && 'contents' in obj) {
-				const streamObj = obj as unknown as { dict: any; contents: Uint8Array };
+				const streamObj = obj as unknown as {
+					dict?: PDFDict;
+					contents?: Uint8Array;
+				};
 				const dict = streamObj.dict;
 
 				if (dict && typeof dict.get === 'function') {

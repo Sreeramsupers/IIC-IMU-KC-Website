@@ -76,10 +76,12 @@ function CadetAvatar({
 	sub,
 	size = 'sm',
 	className = '',
+	onEnlarge,
 }: {
 	sub: CadetSubmissionRecord;
-	size?: 'sm' | 'md' | 'passport';
+	size?: 'sm' | 'md' | 'header' | 'passport';
 	className?: string;
+	onEnlarge?: (data: { url: string; name: string; refId: string; driveUrl?: string }) => void;
 }) {
 	const [imgError, setImgError] = useState(false);
 	const photoUrl = useMemo(() => getCadetPhotoUrl(sub), [sub]);
@@ -91,48 +93,111 @@ function CadetAvatar({
 		return (sub.cadetName?.[0] || 'C').toUpperCase();
 	}, [sub.cadetName]);
 
+	const handleEnlarge = (e?: React.MouseEvent) => {
+		if (e) {
+			e.stopPropagation();
+		}
+		if (!imgError && onEnlarge) {
+			onEnlarge({
+				url: photoUrl,
+				name: sub.cadetName,
+				refId: sub.referenceId,
+				driveUrl: sub.passportPhotoLink || sub.driveFolderUrl,
+			});
+		}
+	};
+
 	if (size === 'passport') {
 		return (
-			<div className={`w-28 sm:w-32 flex-shrink-0 flex flex-col items-center ${className}`}>
-				<div className='w-28 h-36 rounded-lg border-2 border-slate-300 bg-slate-100 overflow-hidden shadow-xs flex items-center justify-center relative print:border-slate-800 cadet-photo-container'>
+			<div className={`w-44 sm:w-52 flex-shrink-0 flex flex-col items-center ${className}`}>
+				<div
+					onClick={handleEnlarge}
+					title={!imgError && onEnlarge ? 'Click to view full photo' : undefined}
+					className={`w-44 h-56 sm:w-52 sm:h-64 rounded-xl border-2 border-slate-300 bg-slate-100 overflow-hidden shadow-sm flex items-center justify-center relative print:border-slate-800 print:w-32 print:h-40 cadet-photo-container ${
+						!imgError && onEnlarge ? 'cursor-pointer group' : ''
+					}`}>
 					{!imgError ? (
-						<img
-							src={photoUrl}
-							alt={`Passport Photo - ${sub.cadetName}`}
-							className='w-full h-full object-cover cadet-photo'
-							onError={() => setImgError(true)}
-							loading='eager'
-						/>
+						<>
+							<img
+								src={photoUrl}
+								alt={`Passport Photo - ${sub.cadetName}`}
+								className='w-full h-full object-cover object-top cadet-photo transition-transform duration-300 group-hover:scale-105'
+								onError={() => setImgError(true)}
+								loading='eager'
+							/>
+							{onEnlarge && (
+								<div className='no-print absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-1.5 backdrop-blur-[1px]'>
+									<div className='p-2 rounded-full bg-white/20 backdrop-blur-md text-white'>
+										<Maximize2 className='w-5 h-5' />
+									</div>
+									<span className='text-xs font-semibold tracking-wide drop-shadow'>
+										Click to Enlarge
+									</span>
+								</div>
+							)}
+						</>
 					) : (
-						<div className='w-full h-full flex flex-col items-center justify-center p-2 text-center text-slate-400'>
-							<User className='w-10 h-10 text-slate-300 mb-1' />
-							<span className='text-[10px] font-bold text-slate-500 uppercase tracking-wider'>
+						<div className='w-full h-full flex flex-col items-center justify-center p-3 text-center text-slate-400'>
+							<User className='w-14 h-14 text-slate-300 mb-1' />
+							<span className='text-xs font-bold text-slate-500 uppercase tracking-wider'>
 								{initials}
 							</span>
 						</div>
 					)}
 				</div>
-				<span className='text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1 text-center block print:text-slate-800'>
-					Cadet Photo
-				</span>
+				<div className='flex items-center justify-between w-full mt-2 px-1'>
+					<span className='text-[11px] font-bold text-slate-600 uppercase tracking-wider print:text-slate-800'>
+						Cadet Photo
+					</span>
+					{onEnlarge && !imgError && (
+						<button
+							onClick={handleEnlarge}
+							type='button'
+							className='no-print inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer hover:underline'>
+							<Eye className='w-3.5 h-3.5' /> Enlarge
+						</button>
+					)}
+				</div>
 			</div>
 		);
 	}
 
-	const dims = size === 'md' ? 'w-10 h-10' : 'w-8 h-8';
-	const textDims = size === 'md' ? 'text-xs' : 'text-[11px]';
+	let dims = 'w-12 h-14 sm:w-14 sm:h-16'; // table view
+	let rounded = 'rounded-lg';
+	let textDims = 'text-xs';
+
+	if (size === 'md') {
+		dims = 'w-16 h-20 sm:w-18 sm:h-22'; // cards grid
+		rounded = 'rounded-xl';
+		textDims = 'text-sm';
+	} else if (size === 'header') {
+		dims = 'w-10 h-12'; // applicant modal banner
+		rounded = 'rounded-lg';
+		textDims = 'text-xs';
+	}
 
 	return (
 		<div
-			className={`${dims} rounded-full bg-slate-100 text-slate-700 border border-slate-200 overflow-hidden flex items-center justify-center font-semibold ${textDims} flex-shrink-0 cadet-photo-container ${className}`}>
+			onClick={handleEnlarge}
+			title={onEnlarge && !imgError ? 'Click to enlarge photo' : sub.cadetName}
+			className={`${dims} ${rounded} bg-slate-100 text-slate-700 border border-slate-300/80 overflow-hidden flex items-center justify-center font-semibold ${textDims} flex-shrink-0 shadow-2xs cadet-photo-container ${
+				onEnlarge && !imgError ? 'cursor-pointer group' : ''
+			} ${className}`}>
 			{!imgError ? (
-				<img
-					src={photoUrl}
-					alt={sub.cadetName}
-					className='w-full h-full object-cover cadet-photo cadet-avatar-img'
-					onError={() => setImgError(true)}
-					loading='lazy'
-				/>
+				<div className='relative w-full h-full'>
+					<img
+						src={photoUrl}
+						alt={sub.cadetName}
+						className='w-full h-full object-cover object-top cadet-photo cadet-avatar-img transition-transform duration-200 group-hover:scale-105'
+						onError={() => setImgError(true)}
+						loading='lazy'
+					/>
+					{onEnlarge && (
+						<div className='no-print absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white'>
+							<Maximize2 className='w-3.5 h-3.5 drop-shadow' />
+						</div>
+					)}
+				</div>
 			) : (
 				<span>{initials}</span>
 			)}
@@ -177,8 +242,28 @@ export default function AdminDashboard() {
 
 	// Selected submission for detailed Application Form modal
 	const [selectedCadet, setSelectedCadet] = useState<CadetSubmissionRecord | null>(null);
+	// Enlarged photo lightbox state
+	const [enlargedPhoto, setEnlargedPhoto] = useState<{
+		url: string;
+		name: string;
+		refId?: string;
+		driveUrl?: string;
+	} | null>(null);
 	const [copiedRef, setCopiedRef] = useState<string | null>(null);
 	const [copiedDrive, setCopiedDrive] = useState<string | null>(null);
+
+	// Close photo modal on Escape key
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				setEnlargedPhoto(null);
+			}
+		};
+		if (enlargedPhoto) {
+			window.addEventListener('keydown', handleKeyDown);
+			return () => window.removeEventListener('keydown', handleKeyDown);
+		}
+	}, [enlargedPhoto]);
 
 	// Auto-refresh timer state
 	const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(false);
@@ -187,17 +272,19 @@ export default function AdminDashboard() {
 	useEffect(() => {
 		try {
 			const savedAuth = localStorage.getItem('iic_admin_auth');
-			if (savedAuth === 'true') {
-				setIsAuthenticated(true);
-			}
 			const savedStatuses = localStorage.getItem('iic_admin_review_statuses');
-			if (savedStatuses) {
-				setReviewStatuses(JSON.parse(savedStatuses));
-			}
 			const savedNotes = localStorage.getItem('iic_admin_candidate_notes');
-			if (savedNotes) {
-				setCandidateNotes(JSON.parse(savedNotes));
-			}
+			queueMicrotask(() => {
+				if (savedAuth === 'true') {
+					setIsAuthenticated(true);
+				}
+				if (savedStatuses) {
+					setReviewStatuses(JSON.parse(savedStatuses));
+				}
+				if (savedNotes) {
+					setCandidateNotes(JSON.parse(savedNotes));
+				}
+			});
 		} catch (e) {
 			console.warn('Storage read warning:', e);
 		}
@@ -310,7 +397,9 @@ export default function AdminDashboard() {
 
 	useEffect(() => {
 		if (isAuthenticated) {
-			fetchSubmissions();
+			queueMicrotask(() => {
+				fetchSubmissions();
+			});
 		}
 	}, [isAuthenticated, fetchSubmissions]);
 
@@ -1144,7 +1233,7 @@ export default function AdminDashboard() {
 									<span className='text-slate-600 text-xs font-semibold'>Sort:</span>
 									<select
 										value={sortBy}
-										onChange={(e) => setSortBy(e.target.value as any)}
+										onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'name' | 'ref')}
 										className='px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium focus:border-blue-500 outline-none'>
 										<option value='newest'>Newest First</option>
 										<option value='oldest'>Oldest First</option>
@@ -1236,11 +1325,18 @@ export default function AdminDashboard() {
 												return (
 													<tr
 														key={sub.id || idx}
-														className='hover:bg-slate-50/70 transition-colors group'>
+														onClick={() => setSelectedCadet(sub)}
+														title='Click to view full application details'
+														className='hover:bg-blue-50/60 transition-colors group cursor-pointer'>
 														{/* Applicant Name & Ref */}
 														<td className='py-2.5 px-3.5 sm:px-4 print:py-1.5 print:px-2'>
 															<div className='flex items-center gap-2.5 min-w-0'>
-																<CadetAvatar sub={sub} size='sm' className='print:w-7 print:h-7' />
+																<CadetAvatar
+																	sub={sub}
+																	size='sm'
+																	className='print:w-8 print:h-10'
+																	onEnlarge={setEnlargedPhoto}
+																/>
 																<div className='min-w-0 flex-1'>
 																	<div
 																		className='font-semibold text-slate-900 group-hover:text-blue-600 transition-colors text-xs sm:text-sm truncate print:text-[8.5pt] print:font-bold'
@@ -1252,9 +1348,10 @@ export default function AdminDashboard() {
 																			{sub.referenceId}
 																		</span>
 																		<button
-																			onClick={() =>
-																				copyToClipboard(sub.referenceId, 'ref', sub.id)
-																			}
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				copyToClipboard(sub.referenceId, 'ref', sub.id);
+																			}}
 																			title='Copy Reference ID'
 																			className='no-print text-slate-400 hover:text-slate-600 cursor-pointer'>
 																			{copiedRef === sub.id ? (
@@ -1318,6 +1415,7 @@ export default function AdminDashboard() {
 															<div className='space-y-0.5 min-w-0'>
 																<a
 																	href={`mailto:${sub.email}`}
+																	onClick={(e) => e.stopPropagation()}
 																	className='cadet-email text-[11px] text-blue-600 hover:underline block truncate print:whitespace-normal print:overflow-visible print:break-all print:text-slate-900 font-medium print:text-[8pt] print:leading-tight'
 																	title={sub.email}>
 																	{sub.email}
@@ -1325,6 +1423,7 @@ export default function AdminDashboard() {
 																{sub.phone && (
 																	<a
 																		href={`tel:${sub.phone}`}
+																		onClick={(e) => e.stopPropagation()}
 																		className='text-[11px] text-slate-500 hover:text-slate-800 block font-mono truncate print:whitespace-normal print:overflow-visible print:text-slate-700 print:text-[7.5pt]'>
 																		{sub.phone}
 																	</a>
@@ -1336,9 +1435,11 @@ export default function AdminDashboard() {
 														<td className='py-2.5 px-3.5 sm:px-4 print:py-1.5 print:px-2 print:text-center'>
 															<select
 																value={status}
-																onChange={(e) =>
-																	updateCadetStatus(sub.referenceId, e.target.value as ReviewStatus)
-																}
+																onClick={(e) => e.stopPropagation()}
+																onChange={(e) => {
+																	e.stopPropagation();
+																	updateCadetStatus(sub.referenceId, e.target.value as ReviewStatus);
+																}}
 																className={`print:hidden w-full max-w-[125px] px-2 py-1 rounded text-[11px] font-medium border outline-none cursor-pointer transition-colors ${
 																	status === 'Selected'
 																		? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold'
@@ -1372,7 +1473,10 @@ export default function AdminDashboard() {
 															<div className='inline-flex items-center gap-1.5 justify-end'>
 																<button
 																	type='button'
-																	onClick={() => setSelectedCadet(sub)}
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		setSelectedCadet(sub);
+																	}}
 																	className='inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0A192F] hover:bg-[#1E293B] active:scale-[0.98] text-white font-medium text-xs transition-all duration-150 cursor-pointer shadow-xs whitespace-nowrap'>
 																	<FileText className='w-3.5 h-3.5' />
 																	<span>View</span>
@@ -1382,6 +1486,7 @@ export default function AdminDashboard() {
 																		href={sub.driveFolderUrl}
 																		target='_blank'
 																		rel='noopener noreferrer'
+																		onClick={(e) => e.stopPropagation()}
 																		title='Open Cadet Google Drive folder'
 																		className='p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200 transition-colors'>
 																		<Folder className='w-3.5 h-3.5' />
@@ -1406,12 +1511,14 @@ export default function AdminDashboard() {
 									return (
 										<div
 											key={sub.id || idx}
-											className='bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between space-y-4 group'>
+											onClick={() => setSelectedCadet(sub)}
+											title='Click to view full application details'
+											className='bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between space-y-4 group cursor-pointer'>
 											<div>
 												{/* Header: Name, Ref, Status */}
 												<div className='flex items-start justify-between gap-3'>
 													<div className='flex items-center gap-2.5'>
-														<CadetAvatar sub={sub} size='md' />
+														<CadetAvatar sub={sub} size='md' onEnlarge={setEnlargedPhoto} />
 														<div>
 															<h4 className='font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-sm'>
 																{sub.cadetName}
@@ -1500,7 +1607,10 @@ export default function AdminDashboard() {
 											<div className='no-print admin-action-btn flex items-center gap-2 pt-3 border-t border-slate-100'>
 												<button
 													type='button'
-													onClick={() => setSelectedCadet(sub)}
+													onClick={(e) => {
+														e.stopPropagation();
+														setSelectedCadet(sub);
+													}}
 													className='flex-1 py-1.5 px-3 rounded-lg bg-[#0A192F] hover:bg-[#1E293B] active:scale-[0.98] text-white font-medium text-xs flex items-center justify-center gap-1.5 transition-all duration-150 cursor-pointer shadow-xs'>
 													<FileText className='w-3.5 h-3.5' />
 													<span>View Form</span>
@@ -1510,6 +1620,7 @@ export default function AdminDashboard() {
 														href={sub.driveFolderUrl}
 														target='_blank'
 														rel='noopener noreferrer'
+														onClick={(e) => e.stopPropagation()}
 														title='Open Cadet Drive Folder'
 														className='p-1.5 rounded-lg bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 transition-colors'>
 														<Folder className='w-4 h-4' />
@@ -1577,14 +1688,19 @@ export default function AdminDashboard() {
 								submissions.map((sub, idx) => (
 									<div
 										key={sub.id || idx}
-										className='p-4 hover:bg-slate-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+										onClick={() => setSelectedCadet(sub)}
+										title='Click to view full application details'
+										className='p-4 hover:bg-blue-50/60 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group'>
 										<div className='flex items-center gap-3 min-w-0'>
-											<div className='w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 border border-slate-200'>
-												<Folder className='w-4 h-4' />
-											</div>
+											<CadetAvatar
+												sub={sub}
+												size='sm'
+												className='print:w-8 print:h-10'
+												onEnlarge={setEnlargedPhoto}
+											/>
 											<div className='min-w-0'>
 												<div className='flex items-center gap-2 flex-wrap'>
-													<h4 className='font-semibold text-slate-900 text-sm truncate'>
+													<h4 className='font-semibold text-slate-900 group-hover:text-blue-600 transition-colors text-sm truncate'>
 														{sub.cadetName}
 													</h4>
 													<span className='font-mono text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded'>
@@ -1609,7 +1725,10 @@ export default function AdminDashboard() {
 											{sub.driveFolderUrl && sub.driveFolderUrl.startsWith('http') ? (
 												<>
 													<button
-														onClick={() => copyToClipboard(sub.driveFolderUrl, 'drive', sub.id)}
+														onClick={(e) => {
+															e.stopPropagation();
+															copyToClipboard(sub.driveFolderUrl, 'drive', sub.id);
+														}}
 														title='Copy Drive Folder URL'
 														className='p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs transition-colors cursor-pointer border border-slate-200'>
 														{copiedDrive === sub.id ? (
@@ -1622,6 +1741,7 @@ export default function AdminDashboard() {
 														href={sub.driveFolderUrl}
 														target='_blank'
 														rel='noopener noreferrer'
+														onClick={(e) => e.stopPropagation()}
 														className='px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs border border-slate-200 shadow-xs flex items-center gap-1.5 transition-colors'>
 														<FolderOpen className='w-3.5 h-3.5 text-emerald-600' />
 														<span>Open in Drive</span>
@@ -1633,7 +1753,10 @@ export default function AdminDashboard() {
 											)}
 
 											<button
-												onClick={() => setSelectedCadet(sub)}
+												onClick={(e) => {
+													e.stopPropagation();
+													setSelectedCadet(sub);
+												}}
 												className='px-3 py-1.5 rounded-lg bg-[#0A192F] hover:bg-[#1E293B] active:scale-[0.98] text-white font-medium text-xs transition-all duration-150 cursor-pointer shadow-xs'>
 												View Form
 											</button>
@@ -1669,7 +1792,7 @@ export default function AdminDashboard() {
 										className='object-contain'
 									/>
 								</div>
-								<CadetAvatar sub={selectedCadet} size='sm' className='border-blue-400/40' />
+								<CadetAvatar sub={selectedCadet} size='header' className='border-blue-400/40' onEnlarge={setEnlargedPhoto} />
 								<div className='min-w-0'>
 									<div className='flex items-center gap-2 flex-wrap'>
 										<h3
@@ -1887,6 +2010,25 @@ export default function AdminDashboard() {
 												{selectedCadet.phone || 'N/A'}
 											</span>
 										</div>
+										{selectedCadet.gender && (
+											<div>
+												<span className='text-slate-600 block font-semibold print:text-slate-800'>
+													Gender
+												</span>
+												<span className='font-medium text-slate-800 capitalize'>
+													{selectedCadet.gender}
+												</span>
+											</div>
+										)}
+										<div>
+											<span className='text-slate-600 block font-semibold print:text-slate-800'>
+												Student Declaration
+											</span>
+											<span className='inline-flex items-center gap-1 font-semibold text-emerald-700'>
+												<CheckCircle2 className='w-3.5 h-3.5 text-emerald-600' />
+												{selectedCadet.declarationAccepted || 'Accepted'}
+											</span>
+										</div>
 										<div className='sm:col-span-3 text-slate-400 border-t border-slate-200/80 pt-2 flex items-center justify-between text-[11px] mt-1'>
 											<span className='text-slate-600 font-semibold'>
 												Application Submission Timestamp:
@@ -1898,7 +2040,7 @@ export default function AdminDashboard() {
 									</div>
 
 									{/* Cadet Passport Photo Box */}
-									<CadetAvatar sub={selectedCadet} size='passport' />
+									<CadetAvatar sub={selectedCadet} size='passport' onEnlarge={setEnlargedPhoto} />
 								</div>
 							</div>
 
@@ -2109,6 +2251,95 @@ export default function AdminDashboard() {
 								</div>
 							</div>
 
+							{/* Section 5: Attached Documentation & Direct Verification Links */}
+							<div className='space-y-3'>
+								<h4 className='text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2 border-b-2 border-slate-300 pb-1.5 print:text-black print:border-black'>
+									<FileText className='w-4 h-4 text-emerald-600 print:text-black' />
+									5. Attached Documentation & Proofs
+								</h4>
+								<div className='grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs'>
+									{/* Combined Master PDF Proofs */}
+									<div className='p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between space-y-2'>
+										<div>
+											<div className='flex items-center gap-2 text-slate-800 font-semibold mb-1'>
+												<FileText className='w-4 h-4 text-blue-600 flex-shrink-0' />
+												<span>Combined Master PDF</span>
+											</div>
+											<p className='text-slate-500 text-[11px] leading-relaxed'>
+												Consolidated proofs, marksheets, and technical portfolio.
+												{selectedCadet.mergedDocsCount && selectedCadet.mergedDocsCount !== '0' && (
+													<span className='block text-slate-700 font-semibold mt-0.5'>
+														{selectedCadet.mergedDocsCount} document(s) verified
+													</span>
+												)}
+											</p>
+										</div>
+										{selectedCadet.proofsLink && selectedCadet.proofsLink.startsWith('http') ? (
+											<a
+												href={selectedCadet.proofsLink}
+												target='_blank'
+												rel='noopener noreferrer'
+												className='px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs w-full mt-2'>
+												<ExternalLink className='w-3.5 h-3.5' />
+												<span>View Master PDF ↗</span>
+											</a>
+										) : (
+											<span className='text-[11px] text-slate-400 italic block mt-2'>No proof PDF linked</span>
+										)}
+									</div>
+
+									{/* Application Document */}
+									<div className='p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between space-y-2'>
+										<div>
+											<div className='flex items-center gap-2 text-slate-800 font-semibold mb-1'>
+												<Award className='w-4 h-4 text-purple-600 flex-shrink-0' />
+												<span>Application Document</span>
+											</div>
+											<p className='text-slate-500 text-[11px] leading-relaxed'>
+												Official registration record generated upon submission.
+											</p>
+										</div>
+										{selectedCadet.docLink && selectedCadet.docLink.startsWith('http') ? (
+											<a
+												href={selectedCadet.docLink}
+												target='_blank'
+												rel='noopener noreferrer'
+												className='px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs w-full mt-2'>
+												<ExternalLink className='w-3.5 h-3.5' />
+												<span>View Application Doc ↗</span>
+											</a>
+										) : (
+											<span className='text-[11px] text-slate-400 italic block mt-2'>No document linked</span>
+										)}
+									</div>
+
+									{/* Google Drive Folder */}
+									<div className='p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between space-y-2'>
+										<div>
+											<div className='flex items-center gap-2 text-slate-800 font-semibold mb-1'>
+												<FolderOpen className='w-4 h-4 text-emerald-600 flex-shrink-0' />
+												<span>Candidate Drive Folder</span>
+											</div>
+											<p className='text-slate-500 text-[11px] leading-relaxed'>
+												Dedicated repository containing all uploaded cadet files.
+											</p>
+										</div>
+										{selectedCadet.driveFolderUrl && selectedCadet.driveFolderUrl.startsWith('http') ? (
+											<a
+												href={selectedCadet.driveFolderUrl}
+												target='_blank'
+												rel='noopener noreferrer'
+												className='px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs w-full mt-2'>
+												<FolderOpen className='w-3.5 h-3.5' />
+												<span>Open Drive Folder ↗</span>
+											</a>
+										) : (
+											<span className='text-[11px] text-slate-400 italic block mt-2'>No folder linked</span>
+										)}
+									</div>
+								</div>
+							</div>
+
 							{/* Evaluator Notes & Decision Tooling */}
 							<div className='p-4 bg-slate-50/60 border border-slate-200 rounded-xl space-y-3'>
 								<h4 className='text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center justify-between'>
@@ -2187,6 +2418,65 @@ export default function AdminDashboard() {
 								<button
 									onClick={() => setSelectedCadet(null)}
 									className='flex-1 sm:flex-none px-4 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium transition-colors cursor-pointer'>
+									Close
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* ======================================================================== */}
+			{/* ENLARGED CADET PHOTO LIGHTBOX MODAL                                       */}
+			{/* ======================================================================== */}
+			{enlargedPhoto && (
+				<div
+					className='no-print fixed inset-0 z-[70] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn'
+					onClick={() => setEnlargedPhoto(null)}>
+					<div
+						className='relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md sm:max-w-lg w-full overflow-hidden flex flex-col my-auto'
+						onClick={(e) => e.stopPropagation()}>
+						{/* Lightbox Header */}
+						<div className='px-4 py-3 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between text-white'>
+							<div className='min-w-0 pr-2'>
+								<h4 className='font-bold text-sm sm:text-base truncate text-white'>{enlargedPhoto.name}</h4>
+								{enlargedPhoto.refId && (
+									<span className='font-mono text-xs text-blue-300'>Reference: {enlargedPhoto.refId}</span>
+								)}
+							</div>
+							<button
+								onClick={() => setEnlargedPhoto(null)}
+								className='p-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer'
+								title='Close (Esc)'>
+								<X className='w-4 h-4' />
+							</button>
+						</div>
+
+						{/* High-Resolution Image Display */}
+						<div className='p-4 sm:p-6 bg-slate-950 flex items-center justify-center min-h-[320px] max-h-[72vh] overflow-hidden'>
+							<img
+								src={enlargedPhoto.url}
+								alt={enlargedPhoto.name}
+								className='max-w-full max-h-[66vh] w-auto h-auto rounded-xl object-contain shadow-2xl border border-slate-800'
+							/>
+						</div>
+
+						{/* Lightbox Footer */}
+						<div className='px-4 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2 flex-wrap'>
+							<span className='text-[11px] text-slate-400 font-medium'>Passport Size Photograph</span>
+							<div className='flex items-center gap-2'>
+								{enlargedPhoto.driveUrl && (
+									<a
+										href={enlargedPhoto.driveUrl}
+										target='_blank'
+										rel='noopener noreferrer'
+										className='px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs'>
+										<ExternalLink className='w-3.5 h-3.5' /> Open in Drive
+									</a>
+								)}
+								<button
+									onClick={() => setEnlargedPhoto(null)}
+									className='px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer'>
 									Close
 								</button>
 							</div>
