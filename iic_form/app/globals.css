@@ -1001,7 +1001,7 @@ button:active:not(:disabled),
 		visibility: visible !important;
 	}
 
-	/* Cadet Photos in print */
+	/* Cadet Photos in print: ensure photos are prominent, sharp, and recognizable */
 	img.cadet-photo,
 	.cadet-photo-container,
 	.cadet-photo-container img,
@@ -1010,6 +1010,50 @@ button:active:not(:disabled),
 		visibility: visible !important;
 		-webkit-print-color-adjust: exact !important;
 		print-color-adjust: exact !important;
+	}
+
+	/* In the admin submissions roster table, ensure cadet photos are large and recognizable */
+	.admin-submissions-table .cadet-photo-container {
+		width: 80px !important;
+		height: 104px !important;
+		min-width: 80px !important;
+		min-height: 104px !important;
+		border-radius: 6px !important;
+		border: 1.5px solid #1e293b !important;
+		box-shadow: none !important;
+		background: #f1f5f9 !important;
+		overflow: hidden !important;
+		flex-shrink: 0 !important;
+	}
+
+	.admin-submissions-table .cadet-photo-container img.cadet-photo,
+	.admin-submissions-table .cadet-avatar-img {
+		width: 100% !important;
+		height: 100% !important;
+		object-fit: cover !important;
+		object-position: top center !important;
+		display: block !important;
+	}
+
+	/* In the printable cadet application form / dossier, passport photo should be full official passport size */
+	#printable-application-form .cadet-photo-container {
+		width: 176px !important;
+		height: 224px !important;
+		min-width: 176px !important;
+		min-height: 224px !important;
+		border-radius: 8px !important;
+		border: 2px solid #0f172a !important;
+		box-shadow: none !important;
+		background: #f8fafc !important;
+		overflow: hidden !important;
+	}
+
+	#printable-application-form .cadet-photo-container img.cadet-photo {
+		width: 100% !important;
+		height: 100% !important;
+		object-fit: cover !important;
+		object-position: top center !important;
+		display: block !important;
 	}
 
 	/* Clean styling for table in print */
@@ -1047,28 +1091,28 @@ button:active:not(:disabled),
 	/* 5-Column strict print distribution fitting exactly 100% of the printable page width */
 	.admin-submissions-table th:nth-child(1),
 	.admin-submissions-table td:nth-child(1) {
-		width: 27% !important; /* Applicant */
+		width: 36% !important; /* Applicant & Photo */
 	}
 
 	.admin-submissions-table th:nth-child(2),
 	.admin-submissions-table td:nth-child(2) {
-		width: 21% !important; /* Year & Department */
+		width: 18% !important; /* Year & Department */
 	}
 
 	.admin-submissions-table th:nth-child(3),
 	.admin-submissions-table td:nth-child(3) {
-		width: 9% !important; /* CGPA */
+		width: 8% !important; /* CGPA */
 		text-align: center !important;
 	}
 
 	.admin-submissions-table th:nth-child(4),
 	.admin-submissions-table td:nth-child(4) {
-		width: 28% !important; /* Contact */
+		width: 25% !important; /* Contact */
 	}
 
 	.admin-submissions-table th:nth-child(5),
 	.admin-submissions-table td:nth-child(5) {
-		width: 15% !important; /* Review Status */
+		width: 13% !important; /* Review Status */
 		text-align: center !important;
 	}
 

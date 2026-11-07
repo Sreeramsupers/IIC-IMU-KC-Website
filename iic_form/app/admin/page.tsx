@@ -109,11 +109,11 @@ function CadetAvatar({
 
 	if (size === 'passport') {
 		return (
-			<div className={`w-44 sm:w-52 flex-shrink-0 flex flex-col items-center ${className}`}>
+			<div className={`w-44 sm:w-52 print:w-44 flex-shrink-0 flex flex-col items-center ${className}`}>
 				<div
 					onClick={handleEnlarge}
 					title={!imgError && onEnlarge ? 'Click to view full photo' : undefined}
-					className={`w-44 h-56 sm:w-52 sm:h-64 rounded-xl border-2 border-slate-300 bg-slate-100 overflow-hidden shadow-sm flex items-center justify-center relative print:border-slate-800 print:w-32 print:h-40 cadet-photo-container ${
+					className={`w-44 h-56 sm:w-52 sm:h-64 rounded-xl border-2 border-slate-300 bg-slate-100 overflow-hidden shadow-sm flex items-center justify-center relative print:border-slate-900 print:w-44 print:h-56 cadet-photo-container ${
 						!imgError && onEnlarge ? 'cursor-pointer group' : ''
 					}`}>
 					{!imgError ? (
@@ -164,12 +164,12 @@ function CadetAvatar({
 
 	let dims = 'w-12 h-14 sm:w-14 sm:h-16'; // table view
 	let rounded = 'rounded-lg';
-	let textDims = 'text-xs';
+	let textDims = 'text-xs print:text-base print:font-bold';
 
 	if (size === 'md') {
 		dims = 'w-16 h-20 sm:w-18 sm:h-22'; // cards grid
 		rounded = 'rounded-xl';
-		textDims = 'text-sm';
+		textDims = 'text-sm print:text-base print:font-bold';
 	} else if (size === 'header') {
 		dims = 'w-10 h-12'; // applicant modal banner
 		rounded = 'rounded-lg';
@@ -190,7 +190,7 @@ function CadetAvatar({
 						alt={sub.cadetName}
 						className='w-full h-full object-cover object-top cadet-photo cadet-avatar-img transition-transform duration-200 group-hover:scale-105'
 						onError={() => setImgError(true)}
-						loading='lazy'
+						loading='eager'
 					/>
 					{onEnlarge && (
 						<div className='no-print absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white'>
@@ -1299,19 +1299,19 @@ export default function AdminDashboard() {
 									<table className='admin-submissions-table w-full text-left text-xs text-slate-700 border-collapse table-fixed min-w-[880px] print:min-w-0 print:w-full'>
 										<thead className='bg-slate-100/95 border-b border-slate-300 text-slate-800 uppercase text-[11px] font-bold tracking-wider print:bg-slate-100 print:text-black'>
 											<tr>
-												<th className='py-3 px-3.5 sm:px-4 w-[29%] min-w-[240px] print:w-[27%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black'>
-													Applicant
+												<th className='py-3 px-3.5 sm:px-4 w-[29%] min-w-[240px] print:w-[36%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black'>
+													Applicant & Photo
 												</th>
-												<th className='py-3 px-3.5 sm:px-4 w-[21%] min-w-[180px] print:w-[21%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black'>
+												<th className='py-3 px-3.5 sm:px-4 w-[21%] min-w-[180px] print:w-[18%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black'>
 													Year & Department
 												</th>
-												<th className='py-3 px-3.5 sm:px-4 w-[10%] min-w-[85px] print:w-[9%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black print:text-center'>
+												<th className='py-3 px-3.5 sm:px-4 w-[10%] min-w-[85px] print:w-[8%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black print:text-center'>
 													CGPA
 												</th>
-												<th className='py-3 px-3.5 sm:px-4 w-[20%] min-w-[170px] print:w-[28%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black'>
+												<th className='py-3 px-3.5 sm:px-4 w-[20%] min-w-[170px] print:w-[25%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black'>
 													Contact
 												</th>
-												<th className='py-3 px-3.5 sm:px-4 w-[11%] min-w-[115px] print:w-[15%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black print:text-center'>
+												<th className='py-3 px-3.5 sm:px-4 w-[11%] min-w-[115px] print:w-[13%] print:min-w-0 print:text-[8pt] print:font-bold print:text-black print:text-center'>
 													Review Status
 												</th>
 												<th className='py-3 px-3.5 sm:px-4 w-[9%] min-w-[90px] text-right no-print admin-action-btn'>
@@ -1329,22 +1329,22 @@ export default function AdminDashboard() {
 														title='Click to view full application details'
 														className='hover:bg-blue-50/60 transition-colors group cursor-pointer'>
 														{/* Applicant Name & Ref */}
-														<td className='py-2.5 px-3.5 sm:px-4 print:py-1.5 print:px-2'>
-															<div className='flex items-center gap-2.5 min-w-0'>
+														<td className='py-2.5 px-3.5 sm:px-4 print:py-2.5 print:px-2.5'>
+															<div className='flex items-center gap-2.5 min-w-0 print:gap-3.5'>
 																<CadetAvatar
 																	sub={sub}
 																	size='sm'
-																	className='print:w-8 print:h-10'
+																	className='print:w-20 print:h-26 print:min-w-[5rem] print:min-h-[6.5rem]'
 																	onEnlarge={setEnlargedPhoto}
 																/>
-																<div className='min-w-0 flex-1'>
+																<div className='min-w-0 flex-1 space-y-0.5 print:space-y-1'>
 																	<div
-																		className='font-semibold text-slate-900 group-hover:text-blue-600 transition-colors text-xs sm:text-sm truncate print:text-[8.5pt] print:font-bold'
+																		className='font-semibold text-slate-900 group-hover:text-blue-600 transition-colors text-xs sm:text-sm truncate print:text-[9.5pt] print:font-bold print:text-black print:whitespace-normal print:leading-snug'
 																		title={sub.cadetName}>
 																		{sub.cadetName}
 																	</div>
-																	<div className='flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 flex-wrap print:text-[7.5pt]'>
-																		<span className='font-mono text-[10.5px] print:text-[7.5pt] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60 leading-none'>
+																	<div className='flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 flex-wrap print:text-[7.5pt] print:gap-1'>
+																		<span className='font-mono text-[10.5px] print:text-[7.5pt] text-slate-600 print:text-black bg-slate-100 print:bg-slate-200 px-1.5 py-0.5 rounded border border-slate-200/60 print:border-slate-400 leading-none print:font-semibold'>
 																			{sub.referenceId}
 																		</span>
 																		<button
@@ -1695,7 +1695,7 @@ export default function AdminDashboard() {
 											<CadetAvatar
 												sub={sub}
 												size='sm'
-												className='print:w-8 print:h-10'
+												className='print:w-16 print:h-20'
 												onEnlarge={setEnlargedPhoto}
 											/>
 											<div className='min-w-0'>
